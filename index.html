@@ -170,6 +170,28 @@
       transform: translateY(-1px);
     }
 
+    /* ---------- SKELETON LOADING ---------- */
+    .skeleton-wrap { max-width: 720px; margin: 40px auto 0; }
+    .skeleton-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; justify-content: center; }
+    .skeleton-progress .sp-bar { width: 200px; height: 6px; border-radius: 6px; background: var(--border); overflow: hidden; }
+    .skeleton-progress .sp-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--rose), var(--magenta)); animation: progressPulse 2.5s ease-in-out infinite; width: 0%; }
+    .skeleton-progress .sp-text { font-size: 12px; color: var(--muted); font-weight: 600; min-width: 120px; }
+    @keyframes progressPulse { 0% { width: 5%; } 50% { width: 85%; } 100% { width: 95%; } }
+    .skeleton-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 8px; }
+    .skeleton-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; overflow: hidden; position: relative; }
+    .skeleton-line { height: 12px; border-radius: 6px; background: var(--border); margin-bottom: 10px; }
+    .skeleton-line.w60 { width: 60%; }
+    .skeleton-line.w80 { width: 80%; }
+    .skeleton-line.w40 { width: 40%; }
+    .skeleton-line.thick { height: 24px; width: 50%; margin-bottom: 6px; }
+    .skeleton-card::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(190,24,93,.04), transparent); animation: shimmer 1.8s infinite; }
+    @keyframes shimmer { to { left: 100%; } }
+    .cache-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+    .cache-badge.fresh { background: var(--green-tint); color: var(--green); }
+    .cache-badge.cached { background: var(--amber-tint); color: var(--amber); }
+    .cache-badge.updating { background: var(--rose-tint); color: var(--rose); animation: pulse 1.6s infinite; }
+    @media (max-width: 980px) { .skeleton-grid { grid-template-columns: repeat(2, 1fr); } }
+
     #fileInput {
       display: none;
     }
@@ -1183,7 +1205,19 @@
       </div>
       <h2 id="loadTitle">Fetching Live Data…</h2>
       <p id="loadMsg">Connecting to production database, please wait</p>
-      <button class="upload-btn" type="button" id="retryBtn" style="display:none" onclick="fetchData()">↻ Retry</button>
+      <div class="skeleton-progress" id="skelProgress" style="display:none">
+        <div class="sp-bar"><div class="sp-fill"></div></div>
+        <span class="sp-text" id="skelText">Loading…</span>
+      </div>
+      <div class="skeleton-wrap" id="skelWrap" style="display:none">
+        <div class="skeleton-grid">
+          <div class="skeleton-card"><div class="skeleton-line w60"></div><div class="skeleton-line thick"></div><div class="skeleton-line w40"></div></div>
+          <div class="skeleton-card"><div class="skeleton-line w60"></div><div class="skeleton-line thick"></div><div class="skeleton-line w40"></div></div>
+          <div class="skeleton-card"><div class="skeleton-line w80"></div><div class="skeleton-line thick"></div><div class="skeleton-line w40"></div></div>
+          <div class="skeleton-card"><div class="skeleton-line w60"></div><div class="skeleton-line thick"></div><div class="skeleton-line w80"></div></div>
+        </div>
+      </div>
+      <button class="upload-btn" type="button" id="retryBtn" style="display:none" onclick="fetchData(true)">↻ Retry</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -1413,6 +1447,28 @@
     let FILTERED = [];       // currently displayed dataset (after collection filter)
     let ACTIVE_COLLECTION = 'All';
 
+    /* ============== CACHE CONFIG ============== */
+    const CACHE_KEY = 'lotDash_MaleLine_cache';
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes — data older than this triggers background refresh
+
+    function saveToCache(rawRows) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), rows: rawRows }));
+      } catch (e) { /* storage full — silently ignore */ }
+    }
+    function loadFromCache() {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || !Array.isArray(obj.rows) || !obj.rows.length) return null;
+        return obj; // { ts, rows }
+      } catch (e) { return null; }
+    }
+    function isCacheFresh(cacheObj) {
+      return cacheObj && (Date.now() - cacheObj.ts) < CACHE_TTL;
+    }
+
     /* ============== AUTO-FETCH ============== */
     const API_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQ-5TSQ1IGPvGxO9USPUhK2lCPUCTREiSt938c2fi0ZlYRvI1xwVhbvO9be2WR8ydCnmaEkFVzMEQ3bohu3t6aCzYn-tisMTcDCj7A9P2ZsGwUsQ57NvP_FxGUtTGOFd-wnPZPmEfrDU2Z5e1zmuoDc9KEETFsk-P8dbPkNmaduTEY_dYDINDBv99g-QLtpmG94Uuftv664Og2tkFA5F5KSbHIAi6mngVOy191itillfbj4-44BNDom-KEqt7GQfXNssyKNvHjBnvrYOQpS1ZrGohO3GA&lib=McljDVlX0hOMCKKPJkfi9tmVr-Ks2CRby';
 
@@ -1424,7 +1480,7 @@
       dashboard.style.display = 'none';
       uploadCard.style.display = 'block';
       setLoadState('loading');
-      fetchData();
+      fetchData(true); // force = skip cache
     });
 
     function setLoadState(state, msg) {
@@ -1432,6 +1488,8 @@
       const title = document.getElementById('loadTitle');
       const loadMsg = document.getElementById('loadMsg');
       const retryBtn = document.getElementById('retryBtn');
+      const skelProgress = document.getElementById('skelProgress');
+      const skelWrap = document.getElementById('skelWrap');
 
       if (state === 'loading') {
         icon.style.background = 'var(--rose-tint)';
@@ -1440,6 +1498,9 @@
         title.textContent = 'Fetching Live Data…';
         loadMsg.textContent = msg || 'Connecting to production database, please wait';
         retryBtn.style.display = 'none';
+        skelProgress.style.display = 'flex';
+        skelWrap.style.display = 'block';
+        skelProgress.querySelector('.sp-text').textContent = 'Connecting…';
       } else if (state === 'error') {
         icon.style.background = 'var(--coral-tint)';
         icon.style.color = 'var(--coral)';
@@ -1447,38 +1508,109 @@
         title.textContent = 'Could Not Load Data';
         loadMsg.textContent = msg || 'Failed to connect to the data source.';
         retryBtn.style.display = 'inline-block';
+        skelProgress.style.display = 'none';
+        skelWrap.style.display = 'none';
       }
     }
 
-    async function fetchData() {
-      setLoadState('loading');
-      try {
-        const res = await fetch(API_URL);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const rows = json.data || json;
-        if (!Array.isArray(rows) || !rows.length) throw new Error('No data returned');
-        const valid = rows.filter(r => r['Lot No.'] && String(r['Lot No.']).trim() !== '');
-        if (!valid.length) throw new Error('No valid lot rows found');
-        DATA = valid.map(normalize);
-        FILTERED = DATA.slice();
-        uploadCard.style.display = 'none';
-        dashboard.style.display = 'block';
-        buildCollectionFilter();
-        renderAll();
-        // Show last-refreshed time in the live dot pill
-        const pill = document.querySelector('.record-pill');
-        if (pill) {
-          const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-          let timeSpan = document.getElementById('lastRefresh');
-          if (!timeSpan) {
-            timeSpan = document.createElement('span');
-            timeSpan.id = 'lastRefresh';
-            timeSpan.style.cssText = 'font-size:11px;color:var(--muted);font-weight:400;margin-left:4px;';
-            pill.appendChild(timeSpan);
-          }
-          timeSpan.textContent = `· refreshed ${ts}`;
+    /** Show data on screen and update the refresh timestamp */
+    function showDashboard(validRows, sourceLabel) {
+      DATA = validRows.map(normalize);
+      FILTERED = DATA.slice();
+      uploadCard.style.display = 'none';
+      dashboard.style.display = 'block';
+      buildCollectionFilter();
+      renderAll();
+      // Show last-refreshed time + source in the live dot pill
+      const pill = document.querySelector('.record-pill');
+      if (pill) {
+        const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        let timeSpan = document.getElementById('lastRefresh');
+        if (!timeSpan) {
+          timeSpan = document.createElement('span');
+          timeSpan.id = 'lastRefresh';
+          timeSpan.style.cssText = 'font-size:11px;color:var(--muted);font-weight:400;margin-left:4px;';
+          pill.appendChild(timeSpan);
         }
+        timeSpan.textContent = `· refreshed ${ts}`;
+        // Show cache/fresh badge
+        let badge = document.getElementById('cacheBadge');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.id = 'cacheBadge';
+          badge.className = 'cache-badge';
+          pill.appendChild(badge);
+        }
+        if (sourceLabel === 'cache') {
+          badge.className = 'cache-badge cached';
+          badge.textContent = '⚡ Instant (cached)';
+        } else if (sourceLabel === 'updating') {
+          badge.className = 'cache-badge updating';
+          badge.textContent = '↻ Updating…';
+        } else {
+          badge.className = 'cache-badge fresh';
+          badge.textContent = '✓ Live';
+          // Auto-hide after 4s
+          setTimeout(() => { badge.textContent = ''; badge.className = 'cache-badge'; }, 4000);
+        }
+      }
+    }
+
+    /** Core fetch from API — returns valid rows array or throws */
+    async function fetchFromAPI() {
+      const res = await fetch(API_URL);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const rows = json.data || json;
+      if (!Array.isArray(rows) || !rows.length) throw new Error('No data returned');
+      const valid = rows.filter(r => r['Lot No.'] && String(r['Lot No.']).trim() !== '');
+      if (!valid.length) throw new Error('No valid lot rows found');
+      return valid;
+    }
+
+    /**
+     * Main fetch controller with cache-first strategy:
+     * 1. If cache exists → show dashboard INSTANTLY from cache
+     * 2. Fetch fresh data in background → swap in silently when ready
+     * 3. If no cache → show skeleton loader → wait for API
+     */
+    async function fetchData(forceRefresh = false) {
+      const cached = forceRefresh ? null : loadFromCache();
+
+      // FAST PATH: show cached data instantly, then refresh in background
+      if (cached && cached.rows.length) {
+        showDashboard(cached.rows, isCacheFresh(cached) ? 'cache' : 'cache');
+
+        // If cache is stale, silently refresh in background
+        if (!isCacheFresh(cached)) {
+          // Update badge to show we're refreshing
+          const badge = document.getElementById('cacheBadge');
+          if (badge) { badge.className = 'cache-badge updating'; badge.textContent = '↻ Syncing…'; }
+          try {
+            const freshRows = await fetchFromAPI();
+            saveToCache(freshRows);
+            showDashboard(freshRows, 'fresh');
+          } catch (e) {
+            // Background refresh failed — cached data is still showing, no disruption
+            if (badge) {
+              badge.className = 'cache-badge cached';
+              badge.textContent = '⚠ Offline (cached)';
+              setTimeout(() => { badge.textContent = ''; badge.className = 'cache-badge'; }, 5000);
+            }
+          }
+        }
+        return;
+      }
+
+      // SLOW PATH: no cache — show loading skeleton, wait for API
+      setLoadState('loading');
+      const skelText = document.getElementById('skelText');
+      try {
+        if (skelText) skelText.textContent = 'Connecting to server…';
+        const freshRows = await fetchFromAPI();
+        if (skelText) skelText.textContent = 'Processing data…';
+        saveToCache(freshRows);
+        showDashboard(freshRows, 'fresh');
       } catch (err) {
         setLoadState('error', `Error: ${err.message}. Check your network or data source.`);
       }
