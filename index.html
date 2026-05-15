@@ -192,6 +192,52 @@
     .cache-badge.updating { background: var(--rose-tint); color: var(--rose); animation: pulse 1.6s infinite; }
     @media (max-width: 980px) { .skeleton-grid { grid-template-columns: repeat(2, 1fr); } }
 
+    /* ---------- SYNC TOAST (top-right floating notification) ---------- */
+    .sync-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      min-width: 280px;
+      max-width: 360px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 32px rgba(120,30,80,.12), 0 2px 8px rgba(120,30,80,.06);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transform: translateX(120%);
+      opacity: 0;
+      transition: transform .4s cubic-bezier(.4,0,.2,1), opacity .4s ease;
+      pointer-events: none;
+    }
+    .sync-toast.show {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sync-toast .st-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .sync-toast .st-icon.loading { background: var(--rose-tint); color: var(--rose); }
+    .sync-toast .st-icon.success { background: var(--green-tint); color: var(--green); }
+    .sync-toast .st-icon.error { background: var(--coral-tint); color: var(--coral); }
+    .sync-toast .st-body { flex: 1; }
+    .sync-toast .st-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+    .sync-toast .st-msg { font-size: 11px; color: var(--muted); }
+    .sync-toast .st-bar { height: 3px; border-radius: 3px; background: var(--border); margin-top: 8px; overflow: hidden; }
+    .sync-toast .st-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--rose), var(--magenta)); animation: progressPulse 2.5s ease-in-out infinite; }
+    .sync-toast .st-close {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      padding: 4px; border-radius: 6px; transition: background .2s;
+    }
+    .sync-toast .st-close:hover { background: var(--border); }
+
     #fileInput {
       display: none;
     }
@@ -1223,6 +1269,21 @@
     <!-- DASHBOARD -->
     <div id="dashboard">
 
+      <!-- SYNC TOAST (floating top-right) -->
+      <div class="sync-toast" id="syncToast">
+        <div class="st-icon loading" id="stIcon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </div>
+        <div class="st-body">
+          <div class="st-title" id="stTitle">Syncing Data…</div>
+          <div class="st-msg" id="stMsg">Fetching latest from production database</div>
+          <div class="st-bar" id="stBar"><div class="st-bar-fill"></div></div>
+        </div>
+        <button class="st-close" id="stClose" title="Dismiss">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
       <div class="top-bar fadeUp">
         <div class="top-bar-left">
           <div class="record-pill"><span class="live-dot"></span> <span id="recordCount">0</span> lots tracked</div>
@@ -1475,13 +1536,58 @@
     const uploadCard = document.getElementById('uploadCard');
     const dashboard = document.getElementById('dashboard');
 
-    document.getElementById('resetBtn').addEventListener('click', () => {
-      DATA = []; FILTERED = []; ACTIVE_COLLECTION = 'All';
-      dashboard.style.display = 'none';
-      uploadCard.style.display = 'block';
-      setLoadState('loading');
-      fetchData(true); // force = skip cache
+    /* ============== SYNC TOAST CONTROLLER ============== */
+    const syncToast = document.getElementById('syncToast');
+    const stIcon = document.getElementById('stIcon');
+    const stTitle = document.getElementById('stTitle');
+    const stMsg = document.getElementById('stMsg');
+    const stBar = document.getElementById('stBar');
+    let toastTimer = null;
+
+    document.getElementById('stClose').addEventListener('click', () => {
+      syncToast.classList.remove('show');
     });
+
+    function showToast(type, title, msg, autoHideMs) {
+      clearTimeout(toastTimer);
+      stTitle.textContent = title;
+      stMsg.textContent = msg;
+      // Icon
+      stIcon.className = 'st-icon ' + type;
+      if (type === 'loading') {
+        stIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+        stBar.style.display = 'block';
+      } else if (type === 'success') {
+        stIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
+        stBar.style.display = 'none';
+      } else {
+        stIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+        stBar.style.display = 'none';
+      }
+      syncToast.classList.add('show');
+      if (autoHideMs) {
+        toastTimer = setTimeout(() => syncToast.classList.remove('show'), autoHideMs);
+      }
+    }
+    function hideToast() { syncToast.classList.remove('show'); }
+
+    /* ============== REFRESH BUTTON — background refresh, dashboard stays visible ============== */
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      backgroundRefresh();
+    });
+
+    /** Refresh data in background — dashboard stays visible with cached/current data */
+    async function backgroundRefresh() {
+      showToast('loading', 'Syncing Data…', 'Fetching latest from production database');
+      try {
+        const freshRows = await fetchFromAPI();
+        saveToCache(freshRows);
+        showDashboard(freshRows, 'fresh');
+        showToast('success', 'Data Updated ✓', `${freshRows.length} lots loaded · ${new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}`, 3500);
+      } catch (err) {
+        showToast('error', 'Sync Failed', err.message + ' — showing previous data', 6000);
+      }
+    }
 
     function setLoadState(state, msg) {
       const icon = document.getElementById('loadIcon');
@@ -1516,12 +1622,12 @@
     /** Show data on screen and update the refresh timestamp */
     function showDashboard(validRows, sourceLabel) {
       DATA = validRows.map(normalize);
-      FILTERED = DATA.slice();
+      FILTERED = ACTIVE_COLLECTION === 'All' ? DATA.slice() : DATA.filter(d => d.short === ACTIVE_COLLECTION);
       uploadCard.style.display = 'none';
       dashboard.style.display = 'block';
       buildCollectionFilter();
       renderAll();
-      // Show last-refreshed time + source in the live dot pill
+      // Show last-refreshed time in the record pill
       const pill = document.querySelector('.record-pill');
       if (pill) {
         const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -1533,26 +1639,6 @@
           pill.appendChild(timeSpan);
         }
         timeSpan.textContent = `· refreshed ${ts}`;
-        // Show cache/fresh badge
-        let badge = document.getElementById('cacheBadge');
-        if (!badge) {
-          badge = document.createElement('span');
-          badge.id = 'cacheBadge';
-          badge.className = 'cache-badge';
-          pill.appendChild(badge);
-        }
-        if (sourceLabel === 'cache') {
-          badge.className = 'cache-badge cached';
-          badge.textContent = '⚡ Instant (cached)';
-        } else if (sourceLabel === 'updating') {
-          badge.className = 'cache-badge updating';
-          badge.textContent = '↻ Updating…';
-        } else {
-          badge.className = 'cache-badge fresh';
-          badge.textContent = '✓ Live';
-          // Auto-hide after 4s
-          setTimeout(() => { badge.textContent = ''; badge.className = 'cache-badge'; }, 4000);
-        }
       }
     }
 
@@ -1569,40 +1655,23 @@
     }
 
     /**
-     * Main fetch controller with cache-first strategy:
-     * 1. If cache exists → show dashboard INSTANTLY from cache
-     * 2. Fetch fresh data in background → swap in silently when ready
-     * 3. If no cache → show skeleton loader → wait for API
+     * Main fetch controller — cache-first, background refresh:
+     * 1. If cache exists → show dashboard INSTANTLY, then fetch in background
+     * 2. No cache → show skeleton loader → wait for API
+     * User NEVER sees a blank screen after the first visit.
      */
-    async function fetchData(forceRefresh = false) {
-      const cached = forceRefresh ? null : loadFromCache();
+    async function fetchData() {
+      const cached = loadFromCache();
 
-      // FAST PATH: show cached data instantly, then refresh in background
+      // FAST PATH: cache exists → show instantly, refresh in background
       if (cached && cached.rows.length) {
-        showDashboard(cached.rows, isCacheFresh(cached) ? 'cache' : 'cache');
-
-        // If cache is stale, silently refresh in background
-        if (!isCacheFresh(cached)) {
-          // Update badge to show we're refreshing
-          const badge = document.getElementById('cacheBadge');
-          if (badge) { badge.className = 'cache-badge updating'; badge.textContent = '↻ Syncing…'; }
-          try {
-            const freshRows = await fetchFromAPI();
-            saveToCache(freshRows);
-            showDashboard(freshRows, 'fresh');
-          } catch (e) {
-            // Background refresh failed — cached data is still showing, no disruption
-            if (badge) {
-              badge.className = 'cache-badge cached';
-              badge.textContent = '⚠ Offline (cached)';
-              setTimeout(() => { badge.textContent = ''; badge.className = 'cache-badge'; }, 5000);
-            }
-          }
-        }
+        showDashboard(cached.rows, 'cache');
+        // Always do a background refresh to get latest data
+        backgroundRefresh();
         return;
       }
 
-      // SLOW PATH: no cache — show loading skeleton, wait for API
+      // SLOW PATH: first visit, no cache — show loading skeleton, wait for API
       setLoadState('loading');
       const skelText = document.getElementById('skelText');
       try {
