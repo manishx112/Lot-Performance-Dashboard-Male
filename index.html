@@ -1,50 +1,3116 @@
-const WebSocket = require('node:ws') || global.WebSocket;
+<!DOCTYPE html>
+<html lang="en">
 
-async function main() {
-  const listRes = await fetch('http://localhost:9333/json/list');
-  const list = await listRes.json();
-  const target = list.find(t => t.url && t.url.includes('localhost:8791'));
-  if (!target) { console.error('no target found'); process.exit(1); }
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
-  let id = 1;
-  const pending = new Map();
-  ws.onmessage = (ev) => {
-    const msg = JSON.parse(ev.data);
-    if (msg.id && pending.has(msg.id)) {
-      pending.get(msg.id)(msg);
-      pending.delete(msg.id);
-    }
-  };
-  await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Male Production Lot Tracking Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        :root {
+            --bg: #fdf6f9;
+            --card: #ffffff;
+            --border: #f1e1e8;
+            --text: #1a0f17;
+            --muted: #7a6470;
+            /* Primary feminine but professional palette */
+            --rose: #be185d;
+            --rose-tint: #fce7f3;
+            --magenta: #c026d3;
+            --magenta-tint: #fae8ff;
+            --plum: #7e22ce;
+            --plum-tint: #f3e8ff;
+            --coral: #e11d48;
+            --coral-tint: #ffe4e6;
+            --amber: #d97706;
+            --amber-tint: #fef3c7;
+            --green: #059669;
+            --green-tint: #d1fae5;
+            --teal: #0891b2;
+            --teal-tint: #cffafe;
+            --radius: 16px;
+            --shadow: 0 1px 2px rgba(120, 30, 80, .04), 0 4px 12px rgba(120, 30, 80, .05);
+            --shadow-lift: 0 4px 8px rgba(120, 30, 80, .06), 0 12px 24px rgba(120, 30, 80, .10);
+        }
 
-  function evaluate(expression) {
-    return new Promise((resolve) => {
-      const myId = id++;
-      pending.set(myId, (msg) => resolve(msg.result));
-      ws.send(JSON.stringify({ id: myId, method: 'Runtime.evaluate', params: { expression, returnByValue: true } }));
-    });
-  }
+        * {
+            box-sizing: border-box;
+        }
 
-  const expr = `
-    JSON.stringify({
-      innerWidth: window.innerWidth,
-      innerHeight: window.innerHeight,
-      devicePixelRatio: window.devicePixelRatio,
-      h1FontSize: getComputedStyle(document.querySelector('h1.title')).fontSize,
-      bodyPaddingLeft: getComputedStyle(document.body).paddingLeft,
-      kpiGridCols: getComputedStyle(document.querySelector('.kpi-grid')).gridTemplateColumns,
-      kpiIconWidth: getComputedStyle(document.querySelector('.kpi-icon')).width,
-      kpiPadding: getComputedStyle(document.querySelector('.kpi')).padding,
-      matchMedia640: window.matchMedia('(max-width: 640px)').matches,
-      matchMedia420: window.matchMedia('(max-width: 420px)').matches,
-      matchMedia980: window.matchMedia('(max-width: 980px)').matches,
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-      bodyOverflowX: getComputedStyle(document.body).overflowX
-    })
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Poppins', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 32px 24px 80px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        /* ---------- HEADER ---------- */
+        .header {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: var(--rose-tint);
+            color: var(--rose);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        .eyebrow .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--rose);
+        }
+
+        h1.title {
+            font-weight: 800;
+            font-size: 44px;
+            line-height: 1.1;
+            margin: 0 0 10px;
+            letter-spacing: -.02em;
+        }
+
+        h1.title .accent {
+            color: var(--rose);
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 16px;
+            margin: 0 0 18px;
+            font-weight: 400;
+        }
+
+        .divider {
+            width: 60px;
+            height: 4px;
+            border-radius: 4px;
+            margin: 0 auto;
+            background: linear-gradient(90deg, var(--rose), var(--magenta));
+        }
+
+        /* ---------- UPLOAD ---------- */
+        .upload-card {
+            background: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 56px 32px;
+            text-align: center;
+            transition: all .25s ease;
+            max-width: 720px;
+            margin: 40px auto 0;
+            box-shadow: var(--shadow);
+        }
+
+        .upload-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 18px;
+            background: var(--rose-tint);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--rose);
+        }
+
+        .upload-card h2 {
+            margin: 0 0 8px;
+            font-weight: 700;
+            font-size: 22px;
+        }
+
+        .upload-card p {
+            margin: 0 0 22px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .upload-btn {
+            background: var(--rose);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+        .upload-btn:hover {
+            background: #9d174d;
+            transform: translateY(-1px);
+        }
+
+        /* ---------- SKELETON LOADING ---------- */
+        .skeleton-wrap {
+            max-width: 720px;
+            margin: 40px auto 0;
+        }
+
+        .skeleton-progress {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            justify-content: center;
+        }
+
+        .skeleton-progress .sp-bar {
+            width: 200px;
+            height: 6px;
+            border-radius: 6px;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .skeleton-progress .sp-fill {
+            height: 100%;
+            border-radius: 6px;
+            background: linear-gradient(90deg, var(--rose), var(--magenta));
+            animation: progressPulse 2.5s ease-in-out infinite;
+            width: 0%;
+        }
+
+        .skeleton-progress .sp-text {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600;
+            min-width: 120px;
+        }
+
+        @keyframes progressPulse {
+            0% {
+                width: 5%;
+            }
+
+            50% {
+                width: 85%;
+            }
+
+            100% {
+                width: 95%;
+            }
+        }
+
+        .skeleton-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-top: 8px;
+        }
+
+        .skeleton-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .skeleton-line {
+            height: 12px;
+            border-radius: 6px;
+            background: var(--border);
+            margin-bottom: 10px;
+        }
+
+        .skeleton-line.w60 {
+            width: 60%;
+        }
+
+        .skeleton-line.w80 {
+            width: 80%;
+        }
+
+        .skeleton-line.w40 {
+            width: 40%;
+        }
+
+        .skeleton-line.thick {
+            height: 24px;
+            width: 50%;
+            margin-bottom: 6px;
+        }
+
+        .skeleton-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(190, 24, 93, .04), transparent);
+            animation: shimmer 1.8s infinite;
+        }
+
+        @keyframes shimmer {
+            to {
+                left: 100%;
+            }
+        }
+
+        .cache-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .cache-badge.fresh {
+            background: var(--green-tint);
+            color: var(--green);
+        }
+
+        .cache-badge.cached {
+            background: var(--amber-tint);
+            color: var(--amber);
+        }
+
+        .cache-badge.updating {
+            background: var(--rose-tint);
+            color: var(--rose);
+            animation: pulse 1.6s infinite;
+        }
+
+        @media (max-width: 980px) {
+            .skeleton-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* ---------- SYNC TOAST (top-right floating notification) ---------- */
+        .sync-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 280px;
+            max-width: 360px;
+            padding: 14px 18px;
+            border-radius: 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 32px rgba(120, 30, 80, .12), 0 2px 8px rgba(120, 30, 80, .06);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateX(120%);
+            opacity: 0;
+            transition: transform .4s cubic-bezier(.4, 0, .2, 1), opacity .4s ease;
+            pointer-events: none;
+        }
+
+        .sync-toast.show {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .sync-toast .st-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .sync-toast .st-icon.loading {
+            background: var(--rose-tint);
+            color: var(--rose);
+        }
+
+        .sync-toast .st-icon.success {
+            background: var(--green-tint);
+            color: var(--green);
+        }
+
+        .sync-toast .st-icon.error {
+            background: var(--coral-tint);
+            color: var(--coral);
+        }
+
+        .sync-toast .st-body {
+            flex: 1;
+        }
+
+        .sync-toast .st-title {
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+
+        .sync-toast .st-msg {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .sync-toast .st-bar {
+            height: 3px;
+            border-radius: 3px;
+            background: var(--border);
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .sync-toast .st-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--rose), var(--magenta));
+            animation: progressPulse 2.5s ease-in-out infinite;
+        }
+
+        .sync-toast .st-close {
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            transition: background .2s;
+        }
+
+        .sync-toast .st-close:hover {
+            background: var(--border);
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* ---------- TOP BAR ---------- */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .record-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            box-shadow: var(--shadow);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 1.6s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(5, 150, 105, .6);
+            }
+
+            50% {
+                box-shadow: 0 0 0 6px rgba(5, 150, 105, 0);
+            }
+        }
+
+        /* Collection filter chips */
+        .collection-filter {
+            display: inline-flex;
+            gap: 4px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 4px;
+            border-radius: 999px;
+            box-shadow: var(--shadow);
+        }
+
+        .collection-filter button {
+            background: transparent;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .collection-filter button.active {
+            background: var(--rose);
+            color: white;
+        }
+
+        .reset-btn {
+            background: white;
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-weight: 500;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--text);
+            transition: all .2s;
+        }
+
+        .reset-btn:hover {
+            background: #fff8fb;
+            border-color: var(--rose);
+            color: var(--rose);
+        }
+
+        /* ---------- QUICK ACTIONS (Refresh Now / Export PDF) ---------- */
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .qa-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            transition: all .2s ease;
+            box-shadow: var(--shadow);
+        }
+
+        .qa-btn.refresh {
+            background: white;
+            color: var(--text);
+        }
+
+        .qa-btn.refresh:hover {
+            border-color: var(--rose);
+            color: var(--rose);
+            transform: translateY(-1px);
+        }
+
+        .qa-btn.pdf {
+            background: #ede9fe;
+            color: #7c3aed;
+            border-color: #ddd6fe;
+        }
+
+        .qa-btn.pdf:hover {
+            background: #e0d9fc;
+            transform: translateY(-1px);
+        }
+
+        .qa-btn svg {
+            flex-shrink: 0;
+        }
+
+        .qa-btn.refresh.spinning svg {
+            animation: spin 1s linear infinite;
+        }
+
+        /* ---------- KPI CARDS ---------- */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .kpi {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--rose);
+            border-radius: var(--radius);
+            padding: 20px 22px;
+            box-shadow: var(--shadow);
+            transition: all .25s ease;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .kpi:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lift);
+        }
+
+        .kpi-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .kpi-body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .kpi-label {
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            font-weight: 600;
+        }
+
+        .kpi-value {
+            font-size: 30px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-top: 4px;
+        }
+
+        .kpi-sub {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        .kpi.rose {
+            border-left-color: var(--rose);
+        }
+
+        .kpi.rose .kpi-icon {
+            background: var(--rose-tint);
+            color: var(--rose);
+        }
+
+        .kpi.magenta {
+            border-left-color: var(--magenta);
+        }
+
+        .kpi.magenta .kpi-icon {
+            background: var(--magenta-tint);
+            color: var(--magenta);
+        }
+
+        .kpi.plum {
+            border-left-color: var(--plum);
+        }
+
+        .kpi.plum .kpi-icon {
+            background: var(--plum-tint);
+            color: var(--plum);
+        }
+
+        .kpi.coral {
+            border-left-color: var(--coral);
+        }
+
+        .kpi.coral .kpi-icon {
+            background: var(--coral-tint);
+            color: var(--coral);
+        }
+
+        .kpi.amber {
+            border-left-color: var(--amber);
+        }
+
+        .kpi.amber .kpi-icon {
+            background: var(--amber-tint);
+            color: var(--amber);
+        }
+
+        .kpi.green {
+            border-left-color: var(--green);
+        }
+
+        .kpi.green .kpi-icon {
+            background: var(--green-tint);
+            color: var(--green);
+        }
+
+        .kpi.teal {
+            border-left-color: var(--teal);
+        }
+
+        .kpi.teal .kpi-icon {
+            background: var(--teal-tint);
+            color: var(--teal);
+        }
+
+        /* ---------- LOT TRACKER ---------- */
+        .tracker-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+        }
+
+        .tracker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .tracker-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .tracker-header h3 span {
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 14px;
+            margin-left: 6px;
+        }
+
+        .lot-select-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .lot-select-wrap label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        #lotSelect {
+            font-family: inherit;
+            padding: 8px 36px 8px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+            min-width: 240px;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='%23be185d' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+
+        #lotSelect:focus {
+            outline: none;
+            border-color: var(--rose);
+            box-shadow: 0 0 0 3px var(--rose-tint);
+        }
+
+        .lot-summary {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .lot-info {
+            background: #fff8fb;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+
+        .lot-info .lbl {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 600;
+        }
+
+        .lot-info .val {
+            font-size: 15px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .lot-info .val.warn {
+            color: var(--coral);
+        }
+
+        .lot-info .val.ok {
+            color: var(--green);
+        }
+
+        .collection-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .03em;
+        }
+
+        .collection-badge.glanza {
+            background: var(--magenta-tint);
+            color: var(--magenta);
+        }
+
+        .collection-badge.resort {
+            background: var(--teal-tint);
+            color: var(--teal);
+        }
+
+        .collection-badge.other {
+            background: var(--plum-tint);
+            color: var(--plum);
+        }
+
+        /* Clothes-type badges — hash-assigned so any style/type code from the
+           sheet gets a consistent, on-brand color rather than falling back to
+           one generic "other" bucket. */
+        .collection-badge.t0 {
+            background: var(--rose-tint);
+            color: var(--rose);
+        }
+
+        .collection-badge.t1 {
+            background: var(--magenta-tint);
+            color: var(--magenta);
+        }
+
+        .collection-badge.t2 {
+            background: var(--plum-tint);
+            color: var(--plum);
+        }
+
+        .collection-badge.t3 {
+            background: var(--teal-tint);
+            color: var(--teal);
+        }
+
+        .collection-badge.t4 {
+            background: var(--amber-tint);
+            color: var(--amber);
+        }
+
+        .collection-badge.t5 {
+            background: var(--green-tint);
+            color: var(--green);
+        }
+
+        .collection-badge.t6 {
+            background: var(--coral-tint);
+            color: var(--coral);
+        }
+
+        /* Pipeline visualization - 7 stages */
+        .pipeline {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0;
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        .stage {
+            position: relative;
+            text-align: center;
+            padding-top: 60px;
+        }
+
+        .stage::before {
+            content: "";
+            position: absolute;
+            top: 22px;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--border);
+        }
+
+        .stage:first-child::before {
+            left: 50%;
+        }
+
+        .stage:last-child::before {
+            right: 50%;
+        }
+
+        .stage.done::before,
+        .stage.current::before {
+            background: linear-gradient(90deg, var(--rose), var(--magenta));
+        }
+
+        .stage .circle {
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--muted);
+            transition: all .3s ease;
+            z-index: 2;
+        }
+
+        .stage.done .circle {
+            background: var(--green);
+            border-color: var(--green);
+            color: white;
+        }
+
+        .stage.current .circle {
+            background: var(--rose);
+            border-color: var(--rose);
+            color: white;
+            box-shadow: 0 0 0 6px var(--rose-tint);
+            animation: currentPulse 2s infinite;
+        }
+
+        @keyframes currentPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 6px var(--rose-tint);
+            }
+
+            50% {
+                box-shadow: 0 0 0 10px rgba(190, 24, 93, .15);
+            }
+        }
+
+        .stage .name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .stage .days {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 3px;
+            min-height: 14px;
+        }
+
+        .stage.skipped .name {
+            color: #c8a4b6;
+            text-decoration: line-through;
+        }
+
+        .stage.skipped .circle {
+            background: #fdf2f7;
+            border-color: var(--border);
+            color: #c8a4b6;
+        }
+
+        .stage-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+            margin-top: 24px;
+        }
+
+        .stage-detail {
+            background: #fff8fb;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            border-left: 3px solid var(--rose);
+        }
+
+        .stage-detail.skip {
+            border-left-color: #e8c7d6;
+            opacity: .65;
+        }
+
+        .stage-detail.done {
+            border-left-color: var(--green);
+        }
+
+        .stage-detail.current {
+            border-left-color: var(--amber);
+            background: var(--amber-tint);
+        }
+
+        .sd-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .sd-name {
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .sd-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .sd-badge.done {
+            background: var(--green-tint);
+            color: var(--green);
+        }
+
+        .sd-badge.current {
+            background: white;
+            color: var(--amber);
+        }
+
+        .sd-badge.skip {
+            background: #fdf2f7;
+            color: var(--muted);
+        }
+
+        .sd-badge.pending {
+            background: var(--border);
+            color: var(--muted);
+        }
+
+        .sd-meta {
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .sd-meta b {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .recommendation {
+            margin-top: 22px;
+            padding: 16px 18px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--rose-tint), var(--magenta-tint));
+            border-left: 4px solid var(--rose);
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .recommendation .ricon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--rose);
+            flex-shrink: 0;
+        }
+
+        .recommendation .rbody h4 {
+            margin: 0 0 4px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .recommendation .rbody p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        /* search toggle (Lot ↔ Article) */
+        .search-toggle {
+            display: inline-flex;
+            background: #fdf2f7;
+            border-radius: 10px;
+            padding: 3px;
+            border: 1px solid var(--border);
+        }
+
+        .search-toggle button {
+            background: transparent;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .search-toggle button.active {
+            background: white;
+            color: var(--rose);
+            box-shadow: 0 1px 3px rgba(190, 24, 93, .10);
+        }
+
+        .search-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search-input-wrap {
+            position: relative;
+        }
+
+        #articleInput {
+            font-family: inherit;
+            padding: 8px 14px 8px 34px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            min-width: 220px;
+        }
+
+        #articleInput:focus {
+            outline: none;
+            border-color: var(--rose);
+            box-shadow: 0 0 0 3px var(--rose-tint);
+        }
+
+        #overdueSearch {
+            font-family: inherit;
+            padding: 8px 14px 8px 34px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            min-width: 260px;
+        }
+
+        #overdueSearch:focus {
+            outline: none;
+            border-color: var(--rose);
+            box-shadow: 0 0 0 3px var(--rose-tint);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--muted);
+            pointer-events: none;
+        }
+
+        /* article matches list */
+        .article-matches {
+            background: #fff8fb;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px;
+            margin-bottom: 18px;
+            display: none;
+        }
+
+        .article-matches.show {
+            display: block;
+            animation: fadeUp .3s ease both;
+        }
+
+        .am-header {
+            padding: 6px 10px 10px;
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .am-header b {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .am-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+
+        .am-chip {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all .2s;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .am-chip:hover {
+            border-color: var(--rose);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .am-chip.active {
+            border-color: var(--rose);
+            background: var(--rose-tint);
+        }
+
+        .am-chip .am-lot {
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        .am-chip .am-meta {
+            font-size: 11px;
+            color: var(--muted);
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .am-chip .am-stage {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 999px;
+            display: inline-block;
+            margin-top: 4px;
+            align-self: flex-start;
+        }
+
+        .am-stage.s1 {
+            background: var(--plum-tint);
+            color: var(--plum);
+        }
+
+        .am-stage.s2 {
+            background: var(--magenta-tint);
+            color: var(--magenta);
+        }
+
+        .am-stage.s3 {
+            background: var(--amber-tint);
+            color: var(--amber);
+        }
+
+        .am-stage.s4 {
+            background: var(--rose-tint);
+            color: var(--rose);
+        }
+
+        .am-stage.s5 {
+            background: var(--teal-tint);
+            color: var(--teal);
+        }
+
+        .am-stage.s6 {
+            background: var(--green-tint);
+            color: var(--green);
+        }
+
+        .am-stage.s7 {
+            background: var(--coral-tint);
+            color: var(--coral);
+        }
+
+        .am-stage.s0 {
+            background: #fdf2f7;
+            color: var(--muted);
+        }
+
+        .am-empty {
+            padding: 20px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        /* article summary stats above lot details */
+        .article-summary {
+            background: linear-gradient(135deg, var(--rose-tint), var(--magenta-tint));
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 18px;
+            display: none;
+        }
+
+        .article-summary.show {
+            display: block;
+        }
+
+        .article-summary .as-title {
+            font-size: 12px;
+            color: var(--rose);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: 6px;
+        }
+
+        .article-summary .as-stats {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+
+        .article-summary .as-stats span b {
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        /* ---------- CHART ROWS ---------- */
+        .row {
+            display: grid;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .row.r2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .row.r3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: all .25s ease;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lift);
+        }
+
+        .chart-card h3 {
+            margin: 0 0 4px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .chart-card .sub {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .chart {
+            width: 100%;
+            height: 320px;
+        }
+
+        /* table */
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table.lot-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        table.lot-table th {
+            text-align: left;
+            padding: 10px 12px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: .04em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        table.lot-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        table.lot-table tbody tr:hover {
+            background: #fff8fb;
+        }
+
+        .chip {
+            display: inline-flex;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .chip.overdue {
+            background: var(--coral-tint);
+            color: var(--coral);
+        }
+
+        .chip.warn {
+            background: var(--amber-tint);
+            color: var(--amber);
+        }
+
+        .chip.ok {
+            background: var(--green-tint);
+            color: var(--green);
+        }
+
+        /* ---------- ANIMATIONS ---------- */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fadeUp {
+            animation: fadeUp .55s ease both;
+        }
+
+        #dashboard {
+            display: none;
+        }
+
+        @media (max-width: 1100px) {
+            .lot-summary {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 980px) {
+
+            .kpi-grid,
+            .lot-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .row.r2,
+            .row.r3 {
+                grid-template-columns: 1fr;
+            }
+
+            .stage-detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1.title {
+                font-size: 32px;
+            }
+
+            .pipeline {
+                grid-template-columns: repeat(4, 1fr);
+                row-gap: 22px;
+            }
+
+            .stage::before {
+                display: none;
+            }
+        }
+
+        /* ---------- MOBILE (<=640px) ---------- */
+        @media (max-width: 640px) {
+            html, body { overflow-x: hidden; }
+
+            /* Mobile-only theme: cooler slate/blue palette + system font, matching the
+               reference look requested for phones. Desktop/tablet keep the rose theme —
+               these custom properties only take effect below this breakpoint. */
+            :root {
+                --bg: #f1f5f9;
+                --card: #ffffff;
+                --border: #e2e8f0;
+                --text: #0f172a;
+                --muted: #64748b;
+                --rose: #2563eb;
+                --rose-tint: #dbeafe;
+                --magenta: #0891b2;
+                --magenta-tint: #cffafe;
+                --plum: #059669;
+                --plum-tint: #d1fae5;
+                --coral: #ea580c;
+                --coral-tint: #ffedd5;
+                --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 2px 10px rgba(15, 23, 42, .05);
+                --shadow-lift: 0 2px 6px rgba(15, 23, 42, .06), 0 10px 20px rgba(15, 23, 42, .08);
+            }
+
+            body {
+                padding: 18px 12px 56px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            }
+
+            /* A few backgrounds are hardcoded (not CSS vars) in the desktop design —
+               swap those specific ones to a neutral slate so they match the new palette. */
+            .lot-info,
+            .stage-detail,
+            .search-toggle,
+            .article-matches,
+            .reset-btn:hover {
+                background: #f8fafc;
+            }
+
+            table.lot-table tbody tr:hover {
+                background: #f8fafc;
+            }
+
+            .stage.skipped .name {
+                color: #94a3b8;
+            }
+
+            .stage.skipped .circle {
+                background: #f1f5f9;
+                color: #94a3b8;
+            }
+
+            .stage-detail.skip {
+                border-left-color: #cbd5e1;
+            }
+
+            #lotSelect {
+                background-image: url("data:image/svg+xml;utf8,<svg fill='%232563eb' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+            }
+
+            .header {
+                margin-bottom: 24px;
+            }
+
+            .eyebrow {
+                font-size: 10px;
+                padding: 5px 10px;
+                margin-bottom: 10px;
+            }
+
+            h1.title {
+                font-size: 24px;
+            }
+
+            .subtitle {
+                font-size: 12.5px;
+                line-height: 1.5;
+                padding: 0 4px;
+            }
+
+            .upload-card {
+                padding: 32px 18px;
+                margin: 24px auto 0;
+            }
+
+            .upload-icon {
+                width: 56px;
+                height: 56px;
+            }
+
+            .upload-card h2 {
+                font-size: 18px;
+            }
+
+            .skeleton-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            /* top bar */
+            .top-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .top-bar-left {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .record-pill {
+                font-size: 12px;
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .collection-filter {
+                flex-wrap: wrap;
+                justify-content: center;
+                flex: 1;
+            }
+
+            .reset-btn {
+                width: 100%;
+            }
+
+            /* kpi cards */
+            .kpi-grid {
+                gap: 12px;
+            }
+
+            .kpi {
+                padding: 14px 16px;
+                gap: 12px;
+            }
+
+            .kpi-icon {
+                width: 42px;
+                height: 42px;
+                flex-shrink: 0;
+            }
+
+            .kpi-icon svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            .kpi-value {
+                font-size: 22px;
+            }
+
+            .kpi-label {
+                font-size: 10.5px;
+            }
+
+            .kpi-sub {
+                font-size: 10px;
+            }
+
+            /* tracker card */
+            .tracker-card {
+                padding: 16px 14px;
+            }
+
+            .tracker-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .tracker-header h3 {
+                font-size: 16px;
+            }
+
+            .tracker-header h3 span {
+                display: block;
+                margin-left: 0;
+                margin-top: 3px;
+            }
+
+            .search-controls {
+                flex-direction: column;
+                align-items: stretch;
+                width: 100%;
+            }
+
+            .search-toggle {
+                display: flex;
+                width: 100%;
+            }
+
+            .search-toggle button {
+                flex: 1;
+            }
+
+            .lot-select-wrap {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            #lotSelect,
+            #articleInput,
+            #overdueSearch,
+            .search-input-wrap {
+                width: 100%;
+                min-width: 0;
+            }
+
+            /* lot summary info grid */
+            .lot-summary {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+            .lot-info {
+                padding: 12px 14px;
+                border-radius: 14px;
+            }
+
+            .lot-info .val.warn {
+                color: #dc2626;
+            }
+
+            /* pipeline: horizontal scroll stepper instead of squished grid */
+            .pipeline {
+                display: flex;
+                grid-template-columns: none;
+                overflow-x: auto;
+                gap: 6px;
+                padding: 4px 2px 10px;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x proximity;
+                margin-bottom: 4px;
+            }
+
+            .stage {
+                flex: 0 0 84px;
+                scroll-snap-align: start;
+                padding-top: 54px;
+            }
+
+            .stage::before {
+                display: block;
+            }
+
+            .stage .circle {
+                width: 34px;
+                height: 34px;
+                font-size: 12px;
+            }
+
+            .stage .name {
+                font-size: 11px;
+            }
+
+            .stage .days {
+                font-size: 10px;
+            }
+
+            .am-list {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+
+            /* charts */
+            .chart-card {
+                padding: 14px;
+            }
+
+            .chart-card h3 {
+                font-size: 14px;
+            }
+
+            /* table */
+            table.lot-table th,
+            table.lot-table td {
+                padding: 8px 8px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+            /* sync toast */
+            .sync-toast {
+                left: 12px;
+                right: 12px;
+                top: 12px;
+                min-width: 0;
+                max-width: none;
+            }
+        }
+
+        /* ---------- SMALL PHONES (<=420px) ---------- */
+        @media (max-width: 420px) {
+            .skeleton-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1.title {
+                font-size: 21px;
+            }
+
+            .stage {
+                flex-basis: 76px;
+            }
+        }
+
+        /* ---------- PRINT / EXPORT PDF ---------- */
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .quick-actions,
+            .reset-btn,
+            .sync-toast,
+            .search-controls,
+            .search-input-wrap,
+            .upload-card {
+                display: none !important;
+            }
+
+            .kpi,
+            .chart-card,
+            .tracker-card {
+                box-shadow: none;
+                border: 1px solid var(--border);
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .kpi:hover,
+            .chart-card:hover {
+                transform: none;
+            }
+
+            .row.r2,
+            .row.r3 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <!-- HEADER -->
+        <div class="header fadeUp">
+            <div class="eyebrow"><span class="dot"></span> Live Production Tracker · Male Line</div>
+            <h1 class="title">Lot <span class="accent">Performance</span> Dashboard</h1>
+            <p class="subtitle">Track every Male-line lot across all 7 production stages — Print → Embroidery →
+                Fabrication
+                → Kaj → Washing → Packing → Shop</p>
+            <div class="divider"></div>
+        </div>
+
+        <!-- LOADING SCREEN -->
+        <div id="uploadCard" class="upload-card fadeUp">
+            <div class="upload-icon" id="loadIcon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+            </div>
+            <h2 id="loadTitle">Fetching Live Data…</h2>
+            <p id="loadMsg">Connecting to production database, please wait</p>
+            <div class="skeleton-progress" id="skelProgress" style="display:none">
+                <div class="sp-bar">
+                    <div class="sp-fill"></div>
+                </div>
+                <span class="sp-text" id="skelText">Loading…</span>
+            </div>
+            <div class="skeleton-wrap" id="skelWrap" style="display:none">
+                <div class="skeleton-grid">
+                    <div class="skeleton-card">
+                        <div class="skeleton-line w60"></div>
+                        <div class="skeleton-line thick"></div>
+                        <div class="skeleton-line w40"></div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton-line w60"></div>
+                        <div class="skeleton-line thick"></div>
+                        <div class="skeleton-line w40"></div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton-line w80"></div>
+                        <div class="skeleton-line thick"></div>
+                        <div class="skeleton-line w40"></div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton-line w60"></div>
+                        <div class="skeleton-line thick"></div>
+                        <div class="skeleton-line w80"></div>
+                    </div>
+                </div>
+            </div>
+            <button class="upload-btn" type="button" id="retryBtn" style="display:none" onclick="fetchData(true)">↻
+                Retry</button>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard">
+
+            <!-- SYNC TOAST (floating top-right) -->
+            <div class="sync-toast" id="syncToast">
+                <div class="st-icon loading" id="stIcon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite">
+                        <polyline points="23 4 23 10 17 10" />
+                        <polyline points="1 20 1 14 7 14" />
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                    </svg>
+                </div>
+                <div class="st-body">
+                    <div class="st-title" id="stTitle">Syncing Data…</div>
+                    <div class="st-msg" id="stMsg">Fetching latest from production database</div>
+                    <div class="st-bar" id="stBar">
+                        <div class="st-bar-fill"></div>
+                    </div>
+                </div>
+                <button class="st-close" id="stClose" title="Dismiss">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="quick-actions fadeUp">
+                <button class="qa-btn refresh" id="refreshNowBtn" type="button">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10" />
+                        <polyline points="1 20 1 14 7 14" />
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                    </svg>
+                    Refresh Now
+                </button>
+                <button class="qa-btn pdf" id="exportPdfBtn" type="button">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                        <polyline points="10 9 9 9 8 9" />
+                    </svg>
+                    Export PDF
+                </button>
+            </div>
+
+            <div class="top-bar fadeUp">
+                <div class="top-bar-left">
+                    <div class="record-pill"><span class="live-dot"></span> <span id="recordCount">0</span> lots tracked
+                    </div>
+                    <div class="collection-filter" id="collectionFilter"></div>
+                </div>
+                <button class="reset-btn" id="resetBtn">↻ Refresh Data</button>
+            </div>
+
+            <!-- KPIs -->
+            <div class="kpi-grid">
+                <div class="kpi rose fadeUp" style="animation-delay:.05s">
+                    <div class="kpi-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                        </svg></div>
+                    <div class="kpi-body"><span class="kpi-label">Total Lots</span><span class="kpi-value"
+                            id="kTotal">0</span><span class="kpi-sub" id="kTotalSub">in pipeline</span></div>
+                </div>
+                <div class="kpi magenta fadeUp" style="animation-delay:.12s">
+                    <div class="kpi-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        </svg></div>
+                    <div class="kpi-body"><span class="kpi-label">Total Pieces</span><span class="kpi-value"
+                            id="kPieces">0</span><span class="kpi-sub" id="kPiecesSub">across all lots</span></div>
+                </div>
+                <div class="kpi plum fadeUp" style="animation-delay:.19s">
+                    <div class="kpi-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg></div>
+                    <div class="kpi-body"><span class="kpi-label">Avg Pipeline Days</span><span class="kpi-value"
+                            id="kAvgDays">0</span><span class="kpi-sub">date → current stage</span></div>
+                </div>
+                <div class="kpi coral fadeUp" style="animation-delay:.26s">
+                    <div class="kpi-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg></div>
+                    <div class="kpi-body"><span class="kpi-label">Overdue Lots</span><span class="kpi-value"
+                            id="kOverdue">0</span><span class="kpi-sub" id="kOverdueSub">need attention</span></div>
+                </div>
+            </div>
+
+            <!-- LOT TRACKER -->
+            <div class="tracker-card fadeUp" style="animation-delay:.33s">
+                <div class="tracker-header">
+                    <h3>Lot Stage Tracker <span>— select a lot, or search by article number</span></h3>
+                    <div class="search-controls">
+                        <div class="search-toggle">
+                            <button id="modeLot" class="active" type="button">By Lot No.</button>
+                            <button id="modeArticle" type="button">By Article No.</button>
+                        </div>
+                        <div id="lotSelectGroup" class="lot-select-wrap">
+                            <label for="lotSelect">Lot</label>
+                            <select id="lotSelect"></select>
+                        </div>
+                        <div id="articleSearchGroup" class="lot-select-wrap" style="display:none">
+                            <label for="articleInput">Article</label>
+                            <div class="search-input-wrap">
+                                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <input type="text" id="articleInput" placeholder="e.g. JDV01…" autocomplete="off"
+                                    list="articleList" />
+                                <datalist id="articleList"></datalist>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="article-matches" id="articleMatches"></div>
+                <div class="article-summary" id="articleSummary"></div>
+
+                <div class="lot-summary" id="lotSummary"></div>
+
+                <div class="pipeline" id="pipeline"></div>
+
+                <div class="stage-detail-grid" id="stageDetails"></div>
+
+                <div class="recommendation" id="recommendation"></div>
+            </div>
+
+            <!-- ROW 1: stage funnel + avg days per stage -->
+            <div class="row r2">
+                <div class="chart-card fadeUp" style="animation-delay:.40s">
+                    <h3>Lots Currently At Each Stage</h3>
+                    <div class="sub">Where your production is sitting right now</div>
+                    <div id="chartFunnel" class="chart"></div>
+                </div>
+                <div class="chart-card fadeUp" style="animation-delay:.47s">
+                    <h3>Average Days Per Stage</h3>
+                    <div class="sub">Where lots are spending the most time — bottleneck spotter</div>
+                    <div id="chartAvgDays" class="chart"></div>
+                </div>
+            </div>
+
+            <!-- ROW 2: vendor load + items -->
+            <div class="row r2">
+                <div class="chart-card fadeUp" style="animation-delay:.54s">
+                    <h3>Vendor Load (Pieces In-Flight)</h3>
+                    <div class="sub">Who's holding your stock right now — by partner and stage</div>
+                    <div id="chartVendor" class="chart"></div>
+                </div>
+                <div class="chart-card fadeUp" style="animation-delay:.61s">
+                    <h3>Pieces by Collection &amp; Size</h3>
+                    <div class="sub">Glanza vs Resort, broken down by size — what dominates the run</div>
+                    <div id="chartCollection" class="chart"></div>
+                </div>
+            </div>
+
+            <!-- ROW 3: stage health donuts (early stages: Embroidery, Fabrication, Kaj) -->
+            <div class="row r3">
+                <div class="chart-card fadeUp" style="animation-delay:.68s">
+                    <h3>Embroidery Stage</h3>
+                    <div class="sub">Done · Current · Pending · Skipped</div>
+                    <div id="chartStage2" class="chart" style="height:280px;"></div>
+                </div>
+                <div class="chart-card fadeUp" style="animation-delay:.75s">
+                    <h3>Fabrication Stage</h3>
+                    <div class="sub">Done · Current · Pending — typically the longest stage</div>
+                    <div id="chartStage3" class="chart" style="height:280px;"></div>
+                </div>
+                <div class="chart-card fadeUp" style="animation-delay:.82s">
+                    <h3>Kaj Stage</h3>
+                    <div class="sub">Done · Current · Pending</div>
+                    <div id="chartStage4" class="chart" style="height:280px;"></div>
+                </div>
+            </div>
+
+            <!-- ROW 4: stage health donuts (final stages: Washing, Packing, Shop) -->
+            <div class="row r3">
+                <div class="chart-card fadeUp" style="animation-delay:.86s">
+                    <h3>Washing Stage</h3>
+                    <div class="sub">Done · Current · Pending — Anoop's load</div>
+                    <div id="chartStage5" class="chart" style="height:280px;"></div>
+                </div>
+                <div class="chart-card fadeUp" style="animation-delay:.90s">
+                    <h3>Packing Stage</h3>
+                    <div class="sub">Done · Current · Pending — ready for shop</div>
+                    <div id="chartStage6" class="chart" style="height:280px;"></div>
+                </div>
+                <div class="chart-card fadeUp" style="animation-delay:.94s">
+                    <h3>Shop Stage</h3>
+                    <div class="sub">Delivered · In transit · Pending</div>
+                    <div id="chartStage7" class="chart" style="height:280px;"></div>
+                </div>
+            </div>
+
+            <!-- OVERDUE TABLE -->
+            <div class="tracker-card fadeUp" style="animation-delay:.98s">
+                <div class="tracker-header">
+                    <h3>Overdue &amp; Risk Lots <span id="overdueSubtitle">— sorted by overdue days</span></h3>
+                    <div class="search-input-wrap">
+                        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <input type="text" id="overdueSearch" placeholder="Search lot, item, vendor, stage…"
+                            autocomplete="off" />
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="lot-table">
+                        <thead>
+                            <tr>
+                                <th>Lot</th>
+                                <th>Collection</th>
+                                <th>Item</th>
+                                <th>Size</th>
+                                <th>Pieces</th>
+                                <th>Current Stage</th>
+                                <th>Days Stuck</th>
+                                <th>Overdue</th>
+                            </tr>
+                        </thead>
+                        <tbody id="overdueBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /* ============== CONSTANTS ============== */
+        const PALETTE = {
+            rose: '#be185d', magenta: '#c026d3', plum: '#7e22ce',
+            coral: '#e11d48', amber: '#d97706', green: '#059669', teal: '#0891b2',
+            border: '#f1e1e8', muted: '#7a6470', text: '#1a0f17'
+        };
+        /* 7 stages — keys match JSON column names exactly */
+        const STAGES = [
+            { n: 1, key: 'Print 1', name: 'Print', vendorKey: 'Print 1', vendorLabel: 'Printer' },
+            { n: 2, key: 'Embroidery 2', name: 'Embroidery', vendorKey: 'Embroidery 2', vendorLabel: 'Embroiderer' },
+            { n: 3, key: 'Fabricator 3', name: 'Fabrication', vendorKey: 'Fabricator 3', vendorLabel: 'Fabricator' },
+            { n: 4, key: 'Kaj 4', name: 'Kaj', vendorKey: 'Kaj 4', vendorLabel: 'Kaj Vendor' },
+            { n: 5, key: 'Washing 5', name: 'Washing', vendorKey: 'Washing 5', vendorLabel: 'Washer' },
+            { n: 6, key: 'Packing 6', name: 'Packing', vendorKey: 'Packing 6', vendorLabel: 'Packer' },
+            { n: 7, key: 'Shop 7', name: 'Shop', vendorKey: 'Shop 7', vendorLabel: 'Shop' }
+        ];
+        const FINAL_STAGE = STAGES.length; // 7
+        /* Realistic per-stage time budgets in days (tuned to Male-line observed flow) */
+        const STAGE_BUDGET = { 1: 3, 2: 3, 3: 18, 4: 5, 5: 5, 6: 3, 7: 2 };
+
+        const FONT = { family: 'Poppins, sans-serif', color: PALETTE.text };
+        const COMMON_LAYOUT = {
+            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+            font: FONT, margin: { t: 10, b: 40, l: 50, r: 20 },
+            xaxis: { gridcolor: PALETTE.border, linecolor: PALETTE.border, tickfont: { family: 'Poppins', size: 11 } },
+            yaxis: { gridcolor: PALETTE.border, linecolor: PALETTE.border, tickfont: { family: 'Poppins', size: 11 } }
+        };
+        const COMMON_CONFIG = { displayModeBar: false, responsive: true };
+
+        let DATA = [];           // full normalized dataset
+        let FILTERED = [];       // currently displayed dataset (after collection filter)
+        let ACTIVE_COLLECTION = 'All';
+
+        /* ============== CACHE CONFIG ============== */
+        const CACHE_KEY = 'lotDash_MaleLine_cache';
+        const CACHE_TTL = 5 * 60 * 1000; // 5 minutes — data older than this triggers background refresh
+
+        function saveToCache(rawRows) {
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), rows: rawRows }));
+            } catch (e) { /* storage full — silently ignore */ }
+        }
+        function loadFromCache() {
+            try {
+                const raw = localStorage.getItem(CACHE_KEY);
+                if (!raw) return null;
+                const obj = JSON.parse(raw);
+                if (!obj || !Array.isArray(obj.rows) || !obj.rows.length) return null;
+                return obj; // { ts, rows }
+            } catch (e) { return null; }
+        }
+        function isCacheFresh(cacheObj) {
+            return cacheObj && (Date.now() - cacheObj.ts) < CACHE_TTL;
+        }
+
+        /* ============== AUTO-FETCH ============== */
+        const API_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQ-5TSQ1IGPvGxO9USPUhK2lCPUCTREiSt938c2fi0ZlYRvI1xwVhbvO9be2WR8ydCnmaEkFVzMEQ3bohu3t6aCzYn-tisMTcDCj7A9P2ZsGwUsQ57NvP_FxGUtTGOFd-wnPZPmEfrDU2Z5e1zmuoDc9KEETFsk-P8dbPkNmaduTEY_dYDINDBv99g-QLtpmG94Uuftv664Og2tkFA5F5KSbHIAi6mngVOy191itillfbj4-44BNDom-KEqt7GQfXNssyKNvHjBnvrYOQpS1ZrGohO3GA&lib=McljDVlX0hOMCKKPJkfi9tmVr-Ks2CRby';
+
+        const uploadCard = document.getElementById('uploadCard');
+        const dashboard = document.getElementById('dashboard');
+
+        /* ============== SYNC TOAST CONTROLLER ============== */
+        const syncToast = document.getElementById('syncToast');
+        const stIcon = document.getElementById('stIcon');
+        const stTitle = document.getElementById('stTitle');
+        const stMsg = document.getElementById('stMsg');
+        const stBar = document.getElementById('stBar');
+        let toastTimer = null;
+
+        document.getElementById('stClose').addEventListener('click', () => {
+            syncToast.classList.remove('show');
+        });
+
+        function showToast(type, title, msg, autoHideMs) {
+            clearTimeout(toastTimer);
+            stTitle.textContent = title;
+            stMsg.textContent = msg;
+            // Icon
+            stIcon.className = 'st-icon ' + type;
+            if (type === 'loading') {
+                stIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+                stBar.style.display = 'block';
+            } else if (type === 'success') {
+                stIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
+                stBar.style.display = 'none';
+            } else {
+                stIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+                stBar.style.display = 'none';
+            }
+            syncToast.classList.add('show');
+            if (autoHideMs) {
+                toastTimer = setTimeout(() => syncToast.classList.remove('show'), autoHideMs);
+            }
+        }
+        function hideToast() { syncToast.classList.remove('show'); }
+
+        /* ============== REFRESH BUTTON — background refresh, dashboard stays visible ============== */
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            backgroundRefresh();
+        });
+
+        /* ============== QUICK ACTIONS — Refresh Now / Export PDF ============== */
+        const refreshNowBtn = document.getElementById('refreshNowBtn');
+        refreshNowBtn.addEventListener('click', () => {
+            refreshNowBtn.classList.add('spinning');
+            backgroundRefresh().finally(() => refreshNowBtn.classList.remove('spinning'));
+        });
+
+        document.getElementById('exportPdfBtn').addEventListener('click', () => {
+            window.print();
+        });
+
+        /** Retry wrapper with exponential backoff — smooths over the transient network blips
+         *  that are common on mobile/Safari (cellular handoff, app-switch, weak signal) so a
+         *  single dropped request never surfaces as a hard failure to the user. */
+        async function fetchWithRetry(maxAttempts, onAttempt) {
+            let lastErr;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                if (onAttempt) onAttempt(attempt, maxAttempts);
+                try {
+                    return await fetchFromAPI();
+                } catch (err) {
+                    lastErr = err;
+                    if (attempt < maxAttempts) {
+                        const delay = Math.min(1500 * Math.pow(1.7, attempt - 1), 8000);
+                        await new Promise(r => setTimeout(r, delay));
+                    }
+                }
+            }
+            throw lastErr;
+        }
+
+        /** Refresh data in background — dashboard stays visible with cached/current data
+         *  throughout; on failure (after retries) we quietly keep the old data on screen
+         *  instead of ever showing an error state over live content. */
+        async function backgroundRefresh() {
+            showToast('loading', 'Syncing Data…', 'Fetching latest from production database');
+            try {
+                const freshRows = await fetchWithRetry(2);
+                saveToCache(freshRows);
+                showDashboard(freshRows, 'fresh');
+                showToast('success', 'Data Updated ✓', `${freshRows.length} lots loaded · ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`, 3500);
+            } catch (err) {
+                showToast('error', 'Still Syncing…', 'Showing your last saved data — will retry automatically', 5000);
+                scheduleAutoRetry();
+            }
+        }
+
+        /* If a sync fails outright, keep trying quietly in the background so the dashboard
+           self-heals the moment connectivity returns — no need for the user to act. */
+        let autoRetryTimer = null;
+        function scheduleAutoRetry() {
+            clearTimeout(autoRetryTimer);
+            autoRetryTimer = setTimeout(() => {
+                if (document.visibilityState === 'visible') backgroundRefresh();
+                else scheduleAutoRetry();
+            }, 20000);
+        }
+
+        function setLoadState(state, msg) {
+            const icon = document.getElementById('loadIcon');
+            const title = document.getElementById('loadTitle');
+            const loadMsg = document.getElementById('loadMsg');
+            const retryBtn = document.getElementById('retryBtn');
+            const skelProgress = document.getElementById('skelProgress');
+            const skelWrap = document.getElementById('skelWrap');
+
+            if (state === 'loading') {
+                icon.style.background = 'var(--rose-tint)';
+                icon.style.color = 'var(--rose)';
+                icon.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+                title.textContent = 'Fetching Live Data…';
+                loadMsg.textContent = msg || 'Connecting to production database, please wait';
+                retryBtn.style.display = 'none';
+                skelProgress.style.display = 'flex';
+                skelWrap.style.display = 'block';
+                skelProgress.querySelector('.sp-text').textContent = 'Connecting…';
+            } else if (state === 'error') {
+                icon.style.background = 'var(--coral-tint)';
+                icon.style.color = 'var(--coral)';
+                icon.innerHTML = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+                title.textContent = 'Could Not Load Data';
+                loadMsg.textContent = msg || 'Failed to connect to the data source.';
+                retryBtn.style.display = 'inline-block';
+                skelProgress.style.display = 'none';
+                skelWrap.style.display = 'none';
+            }
+        }
+
+        /** Show data on screen and update the refresh timestamp */
+        function showDashboard(validRows, sourceLabel) {
+            DATA = validRows.map(normalize);
+            FILTERED = ACTIVE_COLLECTION === 'All' ? DATA.slice() : DATA.filter(d => d.short === ACTIVE_COLLECTION);
+            uploadCard.style.display = 'none';
+            dashboard.style.display = 'block';
+            buildCollectionFilter();
+            renderAll();
+            // Show last-refreshed time in the record pill
+            const pill = document.querySelector('.record-pill');
+            if (pill) {
+                const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                let timeSpan = document.getElementById('lastRefresh');
+                if (!timeSpan) {
+                    timeSpan = document.createElement('span');
+                    timeSpan.id = 'lastRefresh';
+                    timeSpan.style.cssText = 'font-size:11px;color:var(--muted);font-weight:400;margin-left:4px;';
+                    pill.appendChild(timeSpan);
+                }
+                timeSpan.textContent = `· refreshed ${ts}`;
+            }
+        }
+
+        /** Core fetch from API — returns valid rows array or throws.
+         *  Uses an explicit timeout (via AbortController) and `cache:'no-store'` because
+         *  mobile Safari will otherwise sometimes hang on a dropped connection far longer
+         *  than desktop browsers, or silently reuse a stale/failed response from its cache.
+         *  NOTE: this endpoint proxies a Google Sheet and routinely takes 20–40s to respond
+         *  (measured), so the timeout has to comfortably clear that or every attempt aborts
+         *  right before it would have succeeded — the timeout is a safety net for a truly
+         *  dead connection, not a speed target. */
+        async function fetchFromAPI(timeoutMs = 50000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            let res;
+            try {
+                res = await fetch(API_URL, { cache: 'no-store', signal: controller.signal });
+            } catch (err) {
+                if (err.name === 'AbortError') throw new Error('Connection timed out');
+                throw err;
+            } finally {
+                clearTimeout(timer);
+            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const rows = json.data || json;
+            if (!Array.isArray(rows) || !rows.length) throw new Error('No data returned');
+            const valid = rows.filter(r => r['Lot No.'] && String(r['Lot No.']).trim() !== '');
+            if (!valid.length) throw new Error('No valid lot rows found');
+            return valid;
+        }
+
+        /* Pending retry timer for the very first (no-cache) load */
+        let firstLoadRetryTimer = null;
+
+        /** First-visit load — retries through transient failures (common on mobile/Safari)
+         *  before ever showing the error screen, then keeps retrying quietly in the
+         *  background even after that so the page self-heals once connectivity returns.
+         *  Only 2 attempts here (not more): the API itself legitimately takes 20-40s per
+         *  request, so each attempt already gets a generous timeout — piling on more retries
+         *  would just multiply an already-long wait rather than add real reliability. */
+        async function attemptFirstLoad() {
+            clearTimeout(firstLoadRetryTimer);
+            setLoadState('loading');
+            const skelText = document.getElementById('skelText');
+            try {
+                const freshRows = await fetchWithRetry(2, (attempt, max) => {
+                    if (skelText) skelText.textContent = attempt === 1 ? 'Fetching your live sheet — first load can take up to 30–40s…' : `Retrying connection… (${attempt}/${max})`;
+                });
+                if (skelText) skelText.textContent = 'Processing data…';
+                saveToCache(freshRows);
+                showDashboard(freshRows, 'fresh');
+            } catch (err) {
+                setLoadState('error', `Having trouble reaching the server — retrying automatically…`);
+                firstLoadRetryTimer = setTimeout(attemptFirstLoad, 15000);
+            }
+        }
+
+        /**
+         * Main fetch controller — cache-first, background refresh:
+         * 1. If cache exists → show dashboard INSTANTLY, then refresh in background
+         * 2. No cache → show skeleton loader, retry through blips before ever failing
+         * User never sees a blank screen after the first visit, and a working connection
+         * always wins out — errors are held back and retried rather than shown immediately.
+         */
+        async function fetchData() {
+            const cached = loadFromCache();
+
+            // FAST PATH: cache exists → show instantly, refresh in background
+            if (cached && cached.rows.length) {
+                showDashboard(cached.rows, 'cache');
+                backgroundRefresh();
+                return;
+            }
+
+            // SLOW PATH: first visit, no cache — show loading skeleton, retry before failing
+            attemptFirstLoad();
+        }
+
+        /* Keep the dashboard current on its own: re-sync periodically, and immediately
+           when the tab/app regains focus (e.g. switching back to Safari on iOS) if the
+           cached data has gone stale — all silent, never interrupting the visible data. */
+        setInterval(() => {
+            if (dashboard.style.display === 'block' && document.visibilityState === 'visible') {
+                backgroundRefresh();
+            }
+        }, CACHE_TTL);
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || dashboard.style.display !== 'block') return;
+            const cached = loadFromCache();
+            if (!isCacheFresh(cached)) backgroundRefresh();
+        });
+
+        /* Spin keyframe for loading icon */
+        const spinStyle = document.createElement('style');
+        spinStyle.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+        document.head.appendChild(spinStyle);
+
+        /* Kick off fetch on page load */
+        fetchData();
+
+        /* ============== HELPERS ============== */
+        function parseDate(s) {
+            if (!s) return null;
+            s = String(s).trim();
+            if (!s || s.startsWith('---')) return null;
+            let m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+            if (m) {
+                let [_, d, mo, y] = m; y = y.length === 2 ? '20' + y : y;
+                return new Date(+y, +mo - 1, +d);
+            }
+            m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (m) {
+                let [_, d, mo, y] = m;
+                return new Date(+y, +mo - 1, +d);
+            }
+            const d = new Date(s); return isNaN(d) ? null : d;
+        }
+        function daysBetween(a, b) { if (!a || !b) return null; return Math.round((b - a) / (1000 * 60 * 60 * 24)); }
+        function fmtDate(d) { if (!d) return '—'; return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }); }
+        function num(v) { const n = parseFloat(String(v || '').replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+        function txt(v) { const t = String(v || '').trim(); return (!t || t.startsWith('---')) ? '' : t; }
+
+        /* Consistent badge color per clothes-type value (the "Short" column) — hashes the
+           string to one of 7 on-brand tints so any style/type code looks intentional rather
+           than every unrecognized value collapsing into one generic gray "other" badge. */
+        function typeBadgeClass(value) {
+            const palette = ['t0', 't1', 't2', 't3', 't4', 't5', 't6'];
+            const s = String(value || '');
+            let hash = 0;
+            for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+            return palette[hash % palette.length];
+        }
+
+        function normalize(r) {
+            const stages = STAGES.map(s => {
+                const recv = parseDate(r['Received Date ' + s.n]);
+                const disp = parseDate(r['Dispatched Date ' + s.n]);
+                const vendor = txt(r[s.vendorKey]);
+                const pieces = num(r['Pieces ' + s.n]);
+                const piecesRaw = txt(r['Pieces ' + s.n]);
+                // A stage is "skipped" when it has no activity AND a later stage already shows activity.
+                // We mark provisionally here; finalize below.
+                const isSkipped = piecesRaw.startsWith('---');
+                return { ...s, recv, disp, vendor, pieces, isSkipped };
+            });
+
+            // Finalize "skipped" — for any empty stage that has activity in a LATER stage, mark it skipped.
+            for (let i = 0; i < stages.length; i++) {
+                const s = stages[i];
+                const empty = !s.recv && !s.vendor && !s.pieces;
+                if (empty && !s.isSkipped) {
+                    const laterHasActivity = stages.slice(i + 1).some(ns => ns.recv || ns.vendor || ns.pieces);
+                    if (laterHasActivity) s.isSkipped = true;
+                }
+            }
+
+            // Current stage = highest-numbered non-skipped stage with activity but no dispatch
+            // completedThrough = last non-skipped stage with a dispatch date
+            let current = 0, completedThrough = 0;
+            for (let i = 0; i < stages.length; i++) {
+                const s = stages[i];
+                if (s.isSkipped) continue;
+                if (s.recv || s.vendor || s.pieces) {
+                    current = s.n;
+                    if (s.disp) completedThrough = s.n; else break;
+                }
+            }
+            return {
+                raw: r,
+                uniqueId: txt(r['UNIQUE ID']),
+                date: parseDate(r['Date']),
+                overdue: num(r['Overdue Days']),
+                itemNo: txt(r['Item No.']),
+                lotNo: txt(r['Lot No.']),
+                meter: num(r['Meter']),
+                short: txt(r['Short']),     // collection: Glanza / Resort
+                size: txt(r['Size']),
+                pieces: num(r['Pieces']),
+                item: txt(r['Item']),
+                avg: num(r['Average']),
+                stages,
+                currentStage: current,
+                completedThrough
+            };
+        }
+
+        /* ============== COLLECTION FILTER ============== */
+        function buildCollectionFilter() {
+            const wrap = document.getElementById('collectionFilter');
+            const collections = [...new Set(DATA.map(d => d.short).filter(Boolean))].sort();
+            const items = ['All', ...collections];
+            wrap.innerHTML = items.map(c =>
+                `<button data-c="${c}" class="${c === ACTIVE_COLLECTION ? 'active' : ''}">${c}</button>`
+            ).join('');
+            wrap.querySelectorAll('button').forEach(btn => {
+                btn.onclick = () => {
+                    ACTIVE_COLLECTION = btn.dataset.c;
+                    wrap.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+                    FILTERED = ACTIVE_COLLECTION === 'All' ? DATA.slice() : DATA.filter(d => d.short === ACTIVE_COLLECTION);
+                    renderAll();
+                };
+            });
+        }
+
+        /* ============== RENDER ============== */
+        function renderAll() {
+            document.getElementById('recordCount').textContent = FILTERED.length;
+            renderKPIs();
+            renderLotSelect();
+            setupSearchMode();
+            if (FILTERED.length) renderLotDetail(FILTERED[0].lotNo);
+            renderFunnel();
+            renderAvgDays();
+            renderVendor();
+            renderCollection();
+            renderStageDonuts();
+            renderOverdueTable();
+        }
+
+        function renderKPIs() {
+            const totalLots = FILTERED.length;
+            const totalPieces = FILTERED.reduce((s, d) => s + d.pieces, 0);
+            const today = new Date();
+            const inProgress = FILTERED.filter(d => d.currentStage > 0 && d.currentStage < FINAL_STAGE);
+            const avgDays = inProgress.length ? Math.round(inProgress.reduce((s, d) => s + (d.date ? daysBetween(d.date, today) : 0), 0) / inProgress.length) : 0;
+            const overdue = FILTERED.filter(d => d.overdue > 30).length;
+
+            document.getElementById('kTotal').textContent = totalLots;
+            document.getElementById('kTotalSub').textContent = `${inProgress.length} in progress`;
+            document.getElementById('kPieces').textContent = totalPieces.toLocaleString('en-IN');
+            document.getElementById('kPiecesSub').textContent = ACTIVE_COLLECTION === 'All' ? 'across all lots' : `in ${ACTIVE_COLLECTION} collection`;
+            document.getElementById('kAvgDays').textContent = avgDays;
+            document.getElementById('kOverdue').textContent = overdue;
+            document.getElementById('kOverdueSub').textContent = `>30 days overdue`;
+        }
+
+        function renderLotSelect() {
+            const sel = document.getElementById('lotSelect');
+            sel.innerHTML = '';
+            const sorted = [...FILTERED].sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
+            for (const d of sorted) {
+                const opt = document.createElement('option');
+                opt.value = d.lotNo;
+                const collTag = d.short ? ` · ${d.short}` : '';
+                opt.textContent = `Lot ${d.lotNo}${collTag} — ${d.item || d.itemNo} (${d.size})`;
+                sel.appendChild(opt);
+            }
+            sel.onchange = () => renderLotDetail(sel.value);
+
+            const dl = document.getElementById('articleList');
+            const uniqueArticles = [...new Set(FILTERED.map(d => d.itemNo).filter(Boolean))].sort();
+            dl.innerHTML = uniqueArticles.map(a => `<option value="${a}">`).join('');
+        }
+
+        function setupSearchMode() {
+            const modeLot = document.getElementById('modeLot');
+            const modeArt = document.getElementById('modeArticle');
+            const lotGroup = document.getElementById('lotSelectGroup');
+            const artGroup = document.getElementById('articleSearchGroup');
+            const artInput = document.getElementById('articleInput');
+            const matches = document.getElementById('articleMatches');
+            const summary = document.getElementById('articleSummary');
+
+            modeLot.onclick = () => {
+                modeLot.classList.add('active'); modeArt.classList.remove('active');
+                lotGroup.style.display = ''; artGroup.style.display = 'none';
+                matches.classList.remove('show'); summary.classList.remove('show');
+                if (FILTERED.length) renderLotDetail(document.getElementById('lotSelect').value);
+            };
+            modeArt.onclick = () => {
+                modeArt.classList.add('active'); modeLot.classList.remove('active');
+                lotGroup.style.display = 'none'; artGroup.style.display = '';
+                artInput.focus();
+                if (artInput.value.trim()) searchByArticle(artInput.value.trim());
+                else { matches.classList.remove('show'); summary.classList.remove('show'); }
+            };
+            artInput.oninput = e => searchByArticle(e.target.value.trim());
+        }
+
+        function searchByArticle(query) {
+            const matches = document.getElementById('articleMatches');
+            const summary = document.getElementById('articleSummary');
+            if (!query) {
+                matches.classList.remove('show');
+                summary.classList.remove('show');
+                return;
+            }
+            const q = query.toLowerCase();
+            const hits = FILTERED.filter(d => d.itemNo.toLowerCase().includes(q))
+                .sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
+
+            if (!hits.length) {
+                matches.innerHTML = `<div class="am-empty">No lots found for article "<b>${query}</b>"${ACTIVE_COLLECTION !== 'All' ? ` in <b>${ACTIVE_COLLECTION}</b>` : ''}</div>`;
+                matches.classList.add('show');
+                summary.classList.remove('show');
+                return;
+            }
+
+            const totalPieces = hits.reduce((s, d) => s + d.pieces, 0);
+            const stagesCount = { done: 0, current: 0, pending: 0 };
+            hits.forEach(d => {
+                if (d.currentStage === 0 && d.completedThrough === FINAL_STAGE) stagesCount.done++;
+                else if (d.currentStage > 0) stagesCount.current++;
+                else stagesCount.pending++;
+            });
+            const overdueCount = hits.filter(d => d.overdue > 30).length;
+            const exactArticle = hits.every(d => d.itemNo === hits[0].itemNo) ? hits[0].itemNo : null;
+            const itemName = exactArticle ? hits[0].item : `${hits.length} lots matching "${query}"`;
+
+            summary.innerHTML = `
+    <div class="as-title">Article ${exactArticle || query} — Summary</div>
+    <div class="as-stats">
+      <span><b>${itemName}</b></span>
+      <span><b>${hits.length}</b> lots</span>
+      <span><b>${totalPieces.toLocaleString('en-IN')}</b> total pieces</span>
+      <span><b>${stagesCount.current}</b> in progress · <b>${stagesCount.done}</b> completed</span>
+      ${overdueCount ? `<span style="color:var(--coral)"><b>${overdueCount}</b> overdue</span>` : ''}
+    </div>`;
+            summary.classList.add('show');
+
+            const stageNameMap = { 0: 'Pending', 1: 'Print', 2: 'Embroidery', 3: 'Fabrication', 4: 'Kaj', 5: 'Washing', 6: 'Packing', 7: 'Shop' };
+            matches.innerHTML = `
+    <div class="am-header">
+      <span>Found <b>${hits.length}</b> lot${hits.length > 1 ? 's' : ''} — click any to see full pipeline</span>
+    </div>
+    <div class="am-list">
+      ${hits.map(d => {
+                const isDelivered = d.currentStage === 0 && d.completedThrough === FINAL_STAGE;
+                const stageN = isDelivered ? 0 : d.currentStage;
+                const stageName = isDelivered ? 'Delivered' : (stageNameMap[d.currentStage] || 'Pending');
+                return `<div class="am-chip" data-lot="${d.lotNo}">
+          <div class="am-lot">Lot ${d.lotNo} · ${d.size}</div>
+          <div class="am-meta"><span>${d.pieces} pcs</span><span>${d.overdue}d overdue</span></div>
+          <span class="am-stage s${stageN}">${stageName}</span>
+        </div>`;
+            }).join('')}
+    </div>`;
+            matches.classList.add('show');
+
+            matches.querySelectorAll('.am-chip').forEach(chip => {
+                chip.onclick = () => {
+                    matches.querySelectorAll('.am-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    renderLotDetail(chip.dataset.lot);
+                };
+            });
+
+            matches.querySelector('.am-chip').classList.add('active');
+            renderLotDetail(hits[0].lotNo);
+        }
+
+        function renderLotDetail(lotNo) {
+            const d = FILTERED.find(x => x.lotNo === lotNo) || DATA.find(x => x.lotNo === lotNo);
+            if (!d) return;
+
+            const today = new Date();
+            const totalDays = d.date ? daysBetween(d.date, today) : null;
+            const typeClass = typeBadgeClass(d.short);
+            const summary = document.getElementById('lotSummary');
+            summary.innerHTML = `
+    <div class="lot-info"><div class="lbl">Item</div><div class="val">${d.item || '—'}</div></div>
+    <div class="lot-info"><div class="lbl">Clothes Type</div><div class="val">${d.short ? `<span class="collection-badge ${typeClass}">${d.short}</span>` : '—'}</div></div>
+    <div class="lot-info"><div class="lbl">Size · Pieces</div><div class="val">${d.size || '—'} · ${d.pieces}</div></div>
+    <div class="lot-info"><div class="lbl">Started</div><div class="val">${fmtDate(d.date)} <span style="font-weight:500;color:var(--muted);font-size:12px">(${totalDays !== null ? totalDays + 'd ago' : '—'})</span></div></div>
+    <div class="lot-info"><div class="lbl">Overdue Days</div><div class="val ${d.overdue > 30 ? 'warn' : d.overdue > 15 ? '' : 'ok'}">${d.overdue}</div></div>
   `;
-  const result = await evaluate(expr);
-  console.log(result.result.value);
-  process.exit(0);
-}
-main();
+
+            const pipe = document.getElementById('pipeline');
+            pipe.innerHTML = '';
+            d.stages.forEach(s => {
+                const div = document.createElement('div');
+                let cls = 'stage';
+                let daysStr = '';
+                if (s.isSkipped) {
+                    cls += ' skipped';
+                    daysStr = 'skipped';
+                } else if (s.disp) {
+                    cls += ' done';
+                    const dur = (s.recv && s.disp) ? daysBetween(s.recv, s.disp) : null;
+                    daysStr = dur !== null ? `${dur}d` : '✓ done';
+                } else if (s.recv || s.vendor || s.pieces) {
+                    cls += ' current';
+                    const dur = s.recv ? daysBetween(s.recv, today) : null;
+                    daysStr = dur !== null ? `${dur}d here` : 'in progress';
+                } else {
+                    daysStr = 'pending';
+                }
+                div.className = cls;
+                div.innerHTML = `
+      <div class="circle">${s.isSkipped ? '–' : s.n}</div>
+      <div class="name">${s.name}</div>
+      <div class="days">${daysStr}</div>`;
+                pipe.appendChild(div);
+            });
+
+            const det = document.getElementById('stageDetails');
+            det.innerHTML = '';
+            d.stages.forEach(s => {
+                let badge = 'pending', label = 'Pending', cls = '';
+                if (s.isSkipped) { badge = 'skip'; label = 'Skipped'; cls = 'skip'; }
+                else if (s.disp) { badge = 'done'; label = 'Completed'; cls = 'done'; }
+                else if (s.recv || s.vendor || s.pieces) { badge = 'current'; label = 'In Progress'; cls = 'current'; }
+
+                const recvStr = fmtDate(s.recv);
+                const dispStr = fmtDate(s.disp);
+                const dur = (s.recv && s.disp) ? `${daysBetween(s.recv, s.disp)} days` : (s.recv ? `${daysBetween(s.recv, today)} days so far` : '—');
+
+                const card = document.createElement('div');
+                card.className = `stage-detail ${cls}`;
+                card.innerHTML = `
+      <div class="sd-head">
+        <div class="sd-name">Stage ${s.n} — ${s.name}</div>
+        <div class="sd-badge ${badge}">${label}</div>
+      </div>
+      <div class="sd-meta">
+        <span><b>${s.vendorLabel}:</b> ${s.vendor || '—'}</span>
+        <span><b>Pieces:</b> ${s.pieces || '—'}</span>
+        <span><b>Received:</b> ${recvStr}</span>
+        <span><b>Dispatched:</b> ${dispStr}</span>
+        <span><b>Duration:</b> ${dur}</span>
+      </div>`;
+                det.appendChild(card);
+            });
+
+            document.getElementById('recommendation').innerHTML = buildRecommendation(d);
+        }
+
+        function buildRecommendation(d) {
+            const today = new Date();
+            const recos = [];
+
+            if (d.currentStage === 0 && d.completedThrough === FINAL_STAGE) {
+                recos.push(`<strong>Lot fully delivered to Shop.</strong> Archive it and move stock to finished-goods inventory.`);
+            } else if (d.currentStage === FINAL_STAGE) {
+                recos.push(`<strong>At the Shop stage</strong> — final step. Reconcile against the original ${d.pieces} pieces cut.`);
+            } else if (d.currentStage === 0) {
+                recos.push(`<strong>Lot not yet entered into production</strong> — only cut. Send to the first active stage today.`);
+            } else {
+                const cur = d.stages.find(s => s.n === d.currentStage);
+                const next = d.stages.find(s => s.n > d.currentStage && !s.isSkipped);
+                const daysHere = cur && cur.recv ? daysBetween(cur.recv, today) : null;
+
+                if (cur && cur.recv && !cur.disp) {
+                    const budget = STAGE_BUDGET[cur.n] || 7;
+                    if (daysHere !== null && daysHere > budget) {
+                        recos.push(`<strong>${cur.name} is running long</strong> — ${daysHere} days vs expected ~${budget} days. Call ${cur.vendor || 'the vendor'} today and push for dispatch.`);
+                    } else {
+                        recos.push(`<strong>Currently at ${cur.name}</strong> with ${cur.vendor || 'vendor'} — ${daysHere || 0} days in. Pacing is healthy.`);
+                    }
+                }
+                if (next) {
+                    const nextNote = {
+                        2: 'Confirm embroidery capacity in advance.',
+                        3: 'Fabrication is the longest stage — book the fabricator slot now.',
+                        4: 'Kaj turnaround is fast; have buttons & threads ready.',
+                        5: 'Anoop handles your washing — book his slot now.',
+                        6: 'Have polybags + tags ready before stock arrives.',
+                        7: 'Keep dispatch documents prepared.'
+                    }[next.n] || 'Keep the next vendor warned.';
+                    recos.push(`Next step: <strong>${next.name}</strong>. ${nextNote}`);
+                }
+                if (d.overdue > 30) {
+                    recos.push(`<strong>${d.overdue} days overdue</strong> against original commitment — escalate. With Diwali peak season approaching, every extra day here eats into selling capacity.`);
+                }
+            }
+            return `
+    <div class="ricon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H7a4 4 0 0 1 0-8h2"/><path d="M15 11h2a4 4 0 0 0 0-8h-2"/><line x1="7" y1="11" x2="17" y2="11"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M17 11l-1 4a4 4 0 0 1-8 0l-1-4"/></svg></div>
+    <div class="rbody">
+      <h4>Recommended Next Action</h4>
+      <p>${recos.join(' ')}</p>
+    </div>`;
+        }
+
+        /* ============== CHARTS ============== */
+        function renderFunnel() {
+            const counts = STAGES.map(() => 0);
+            let done = 0;
+            FILTERED.forEach(d => {
+                if (d.currentStage === 0 && d.completedThrough === FINAL_STAGE) done++;
+                else if (d.currentStage > 0) counts[d.currentStage - 1]++;
+            });
+            const labels = STAGES.map(s => s.name);
+            const colors = [PALETTE.plum, PALETTE.magenta, PALETTE.amber, PALETTE.rose, PALETTE.teal, PALETTE.green, PALETTE.coral];
+            const trace = {
+                type: 'bar', orientation: 'h',
+                x: counts, y: labels,
+                marker: { color: colors, line: { width: 0 } },
+                text: counts.map(c => c ? c : ''), textposition: 'outside',
+                textfont: { family: 'Poppins', size: 12, color: PALETTE.text },
+                hovertemplate: '<b>%{y}</b><br>%{x} lots here<extra></extra>'
+            };
+            Plotly.newPlot('chartFunnel', [trace], {
+                ...COMMON_LAYOUT,
+                margin: { t: 10, b: 40, l: 110, r: 40 },
+                xaxis: {
+                    type: 'linear',
+                    gridcolor: PALETTE.border, linecolor: PALETTE.border,
+                    tickfont: { family: 'Poppins', size: 11, color: PALETTE.muted },
+                    title: { text: 'Lots', font: { size: 11, color: PALETTE.muted } },
+                    zeroline: false,
+                    dtick: 1
+                },
+                yaxis: { ...COMMON_LAYOUT.yaxis, autorange: 'reversed', gridcolor: 'transparent' },
+                height: 320,
+                bargap: 0.35
+            }, COMMON_CONFIG);
+        }
+
+        function renderAvgDays() {
+            const totals = STAGES.map(s => ({ name: s.name, sum: 0, n: 0 }));
+            FILTERED.forEach(d => {
+                d.stages.forEach((s, i) => {
+                    if (s.recv && s.disp) {
+                        totals[i].sum += daysBetween(s.recv, s.disp);
+                        totals[i].n++;
+                    }
+                });
+            });
+            const avg = totals.map(t => t.n ? +(t.sum / t.n).toFixed(1) : 0);
+            const labels = totals.map(t => t.name);
+            const trace = {
+                type: 'bar',
+                x: labels, y: avg,
+                marker: {
+                    color: avg,
+                    colorscale: [[0, PALETTE.rose], [1, PALETTE.magenta]],
+                    line: { width: 0 }
+                },
+                text: avg.map(v => v ? v + 'd' : ''), textposition: 'outside',
+                textfont: { family: 'Poppins', size: 12, color: PALETTE.text },
+                hovertemplate: '<b>%{x}</b><br>Avg: %{y} days<extra></extra>'
+            };
+            Plotly.newPlot('chartAvgDays', [trace], {
+                ...COMMON_LAYOUT,
+                margin: { t: 10, b: 50, l: 50, r: 20 },
+                yaxis: { ...COMMON_LAYOUT.yaxis, title: { text: 'Days', font: { size: 11, color: PALETTE.muted } } },
+                height: 320
+            }, COMMON_CONFIG);
+        }
+
+        function renderVendor() {
+            const load = {};
+            FILTERED.forEach(d => {
+                d.stages.forEach(s => {
+                    if (s.vendor && s.recv && !s.disp) {
+                        const key = `${s.vendor} (${s.name})`;
+                        load[key] = (load[key] || 0) + (s.pieces || d.pieces);
+                    }
+                });
+            });
+            const entries = Object.entries(load).sort((a, b) => b[1] - a[1]).slice(0, 10).reverse();
+            if (!entries.length) {
+                document.getElementById('chartVendor').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:280px;color:var(--muted);font-size:13px">No in-flight vendor load right now</div>';
+                return;
+            }
+            const trace = {
+                type: 'bar', orientation: 'h',
+                y: entries.map(e => e[0]), x: entries.map(e => e[1]),
+                marker: { color: PALETTE.rose, line: { width: 0 } },
+                text: entries.map(e => e[1].toLocaleString('en-IN')),
+                textposition: 'outside',
+                textfont: { family: 'Poppins', size: 12, color: PALETTE.text, weight: 600 },
+                cliponaxis: false,
+                hovertemplate: '<b>%{y}</b><br>%{x} pieces in-flight<extra></extra>'
+            };
+            const maxVal = Math.max(...entries.map(e => e[1]));
+            Plotly.newPlot('chartVendor', [trace], {
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                font: FONT,
+                margin: { t: 10, b: 40, l: 180, r: 60 },
+                xaxis: {
+                    type: 'linear',
+                    gridcolor: PALETTE.border, linecolor: PALETTE.border,
+                    tickfont: { family: 'Poppins', size: 11, color: PALETTE.muted },
+                    title: { text: 'Pieces', font: { size: 11, color: PALETTE.muted } },
+                    range: [0, maxVal * 1.18],
+                    zeroline: false
+                },
+                yaxis: {
+                    type: 'category',
+                    gridcolor: 'transparent', linecolor: PALETTE.border,
+                    tickfont: { family: 'Poppins', size: 12, color: PALETTE.text }
+                },
+                height: 320,
+                bargap: 0.35
+            }, COMMON_CONFIG);
+        }
+
+        /* Stacked bar: pieces by collection (Short), broken down by size. */
+        function renderCollection() {
+            // Build matrix: { collection: { size: pieces } }
+            const matrix = {};
+            const sizeSet = new Set();
+            FILTERED.forEach(d => {
+                const c = d.short || 'Unknown';
+                const sz = d.size || '—';
+                matrix[c] = matrix[c] || {};
+                matrix[c][sz] = (matrix[c][sz] || 0) + d.pieces;
+                sizeSet.add(sz);
+            });
+            const collections = Object.keys(matrix).sort((a, b) => {
+                const aT = Object.values(matrix[a]).reduce((s, v) => s + v, 0);
+                const bT = Object.values(matrix[b]).reduce((s, v) => s + v, 0);
+                return bT - aT;
+            });
+            const sizes = [...sizeSet].sort();
+            // Size colour palette — distinct but on-brand
+            const sizeColors = [PALETTE.rose, PALETTE.magenta, PALETTE.plum, PALETTE.teal, PALETTE.amber, PALETTE.green, PALETTE.coral];
+
+            const traces = sizes.map((sz, i) => ({
+                type: 'bar',
+                name: sz,
+                x: collections,
+                y: collections.map(c => matrix[c][sz] || 0),
+                marker: { color: sizeColors[i % sizeColors.length], line: { width: 0 } },
+                hovertemplate: `<b>${sz}</b><br>%{x}: %{y} pieces<extra></extra>`,
+                text: collections.map(c => {
+                    const v = matrix[c][sz] || 0;
+                    return v ? v.toLocaleString('en-IN') : '';
+                }),
+                textposition: 'inside',
+                textfont: { family: 'Poppins', size: 11, color: '#fff', weight: 600 },
+                insidetextanchor: 'middle'
+            }));
+
+            Plotly.newPlot('chartCollection', traces, {
+                ...COMMON_LAYOUT,
+                barmode: 'stack',
+                margin: { t: 10, b: 40, l: 60, r: 20 },
+                xaxis: { ...COMMON_LAYOUT.xaxis, gridcolor: 'transparent' },
+                yaxis: { ...COMMON_LAYOUT.yaxis, title: { text: 'Pieces', font: { size: 11, color: PALETTE.muted } } },
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom', y: 1.02,
+                    xanchor: 'right', x: 1,
+                    font: { family: 'Poppins', size: 11, color: PALETTE.text }
+                },
+                height: 320,
+                bargap: 0.45
+            }, COMMON_CONFIG);
+        }
+
+        /* Donuts for all 6 active stages (Print stage 1 is skipped on every lot in current data) */
+        function renderStageDonuts() {
+            const targets = [
+                { stageN: 2, divId: 'chartStage2' },
+                { stageN: 3, divId: 'chartStage3' },
+                { stageN: 4, divId: 'chartStage4' },
+                { stageN: 5, divId: 'chartStage5' },
+                { stageN: 6, divId: 'chartStage6' },
+                { stageN: 7, divId: 'chartStage7' }
+            ];
+            const labels = ['Completed', 'In Progress', 'Pending', 'Skipped'];
+            const colors = [PALETTE.green, PALETTE.amber, PALETTE.muted, '#e8c7d6'];
+
+            targets.forEach(t => {
+                let done = 0, cur = 0, pending = 0, skip = 0;
+                FILTERED.forEach(d => {
+                    const s = d.stages[t.stageN - 1];
+                    if (s.isSkipped) skip++;
+                    else if (s.disp) done++;
+                    else if (s.recv || s.vendor || s.pieces) cur++;
+                    else pending++;
+                });
+                const values = [done, cur, pending, skip];
+                Plotly.newPlot(t.divId, [{
+                    type: 'pie', hole: 0.58, labels, values,
+                    marker: { colors, line: { color: '#fff', width: 2 } },
+                    textinfo: 'label+value', textfont: { family: 'Poppins', size: 11 },
+                    hovertemplate: '<b>%{label}</b><br>%{value} lots (%{percent})<extra></extra>'
+                }], {
+                    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: FONT, margin: { t: 10, b: 10, l: 10, r: 10 },
+                    showlegend: false,
+                    annotations: [{
+                        text: `<b style="font-size:22px">${FILTERED.length}</b><br><span style="font-size:11px;color:${PALETTE.muted}">lots</span>`,
+                        showarrow: false, font: { family: 'Poppins', size: 14, color: PALETTE.text }
+                    }],
+                    height: 280
+                }, COMMON_CONFIG);
+            });
+        }
+
+        function renderOverdueTable() {
+            const today = new Date();
+            const queryInput = document.getElementById('overdueSearch');
+            const query = (queryInput.value || '').trim().toLowerCase();
+
+            let allRows = FILTERED
+                .filter(d => d.currentStage > 0 && d.currentStage < FINAL_STAGE)
+                .map(d => {
+                    const cur = d.stages.find(s => s.n === d.currentStage);
+                    const daysHere = cur && cur.recv ? daysBetween(cur.recv, today) : 0;
+                    return { d, cur, daysHere };
+                });
+
+            // Apply search across multiple fields
+            if (query) {
+                allRows = allRows.filter(({ d, cur }) => {
+                    const hay = [
+                        `lot ${d.lotNo}`, d.lotNo,
+                        d.short, d.item, d.itemNo, d.size,
+                        cur ? cur.name : '',
+                        cur ? cur.vendor : ''
+                    ].join(' ').toLowerCase();
+                    return hay.includes(query);
+                });
+            }
+
+            allRows.sort((a, b) => b.d.overdue - a.d.overdue);
+
+            // When searching, show all matches; otherwise cap at 12 to keep dashboard tight
+            const rows = query ? allRows : allRows.slice(0, 12);
+
+            // Update subtitle to reflect what's being shown
+            const sub = document.getElementById('overdueSubtitle');
+            if (query) {
+                sub.textContent = `— ${allRows.length} result${allRows.length === 1 ? '' : 's'} for "${query}"`;
+            } else {
+                sub.textContent = `— sorted by overdue days · top 12`;
+            }
+
+            const body = document.getElementById('overdueBody');
+            if (!rows.length) {
+                const msg = query ? `No lots match "${query}".` : 'No in-flight lots to review.';
+                body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">${msg}</td></tr>`;
+                return;
+            }
+            body.innerHTML = rows.map(({ d, cur, daysHere }) => {
+                const chip = d.overdue > 35 ? 'overdue' : d.overdue > 20 ? 'warn' : 'ok';
+                const collClass = (d.short || '').toLowerCase() === 'glanza' ? 'glanza' :
+                    (d.short || '').toLowerCase() === 'resort' ? 'resort' : 'other';
+                const collCell = d.short ? `<span class="collection-badge ${collClass}">${d.short}</span>` : '—';
+                return `<tr>
+      <td><strong>Lot ${d.lotNo}</strong></td>
+      <td>${collCell}</td>
+      <td>${d.item || '—'}</td>
+      <td>${d.size || '—'}</td>
+      <td>${d.pieces.toLocaleString('en-IN')}</td>
+      <td>${cur ? cur.name : '—'}${cur && cur.vendor ? ' · ' + cur.vendor : ''}</td>
+      <td>${daysHere || '—'}</td>
+      <td><span class="chip ${chip}">${d.overdue} days</span></td>
+    </tr>`;
+            }).join('');
+        }
+
+        /* Wire up the overdue-table search box once at load */
+        (function wireOverdueSearch() {
+            const search = document.getElementById('overdueSearch');
+            if (search) {
+                search.addEventListener('input', () => {
+                    if (FILTERED && FILTERED.length) renderOverdueTable();
+                });
+            }
+        })();
+    </script>
+</body>
+
+</html>
