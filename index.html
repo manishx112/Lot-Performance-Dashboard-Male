@@ -513,6 +513,54 @@
             color: var(--rose);
         }
 
+        /* ---------- ALL LOTS / PENDING LOT SLIDER ---------- */
+        .lot-slider {
+            position: relative;
+            display: inline-flex;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 3px;
+            box-shadow: var(--shadow);
+        }
+
+        .lot-slider-thumb {
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            left: 3px;
+            background: var(--rose);
+            border-radius: 999px;
+            transition: left .25s cubic-bezier(.4, 0, .2, 1), width .25s cubic-bezier(.4, 0, .2, 1);
+            z-index: 0;
+        }
+
+        .lot-slider-opt {
+            position: relative;
+            z-index: 1;
+            flex: 1 1 0;
+            font-family: inherit;
+            border: none;
+            background: transparent;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: color .2s;
+            outline: none;
+        }
+
+        .lot-slider-opt.active {
+            color: #fff;
+        }
+
+        .lot-slider-opt:hover:not(.active) {
+            color: var(--rose);
+        }
+
         /* ---------- QUICK ACTIONS (Refresh Now / Export PDF) ---------- */
         .quick-actions {
             display: flex;
@@ -1431,6 +1479,11 @@
             color: var(--green);
         }
 
+        .chip.delivered {
+            background: var(--teal-tint);
+            color: var(--teal);
+        }
+
         /* ---------- ANIMATIONS ---------- */
         @keyframes fadeUp {
             from {
@@ -1612,6 +1665,10 @@
             }
 
             .reset-btn {
+                width: 100%;
+            }
+
+            .lot-slider {
                 width: 100%;
             }
 
@@ -1954,6 +2011,11 @@
                     </div>
                     <div class="collection-filter" id="collectionFilter"></div>
                 </div>
+                <div class="lot-slider" id="lotStatusSlider">
+                    <div class="lot-slider-thumb"></div>
+                    <button type="button" class="lot-slider-opt" data-mode="all" onclick="setLotStatusFilter('all')">All Lots</button>
+                    <button type="button" class="lot-slider-opt active" data-mode="pending" onclick="setLotStatusFilter('pending')">Pending Lot</button>
+                </div>
                 <button class="reset-btn" id="resetBtn">↻ Refresh Data</button>
             </div>
 
@@ -2176,6 +2238,9 @@
         let DATA = [];           // full normalized dataset
         let FILTERED = [];       // currently displayed dataset (after collection filter)
         let ACTIVE_COLLECTION = 'All';
+        let lotStatusFilter = 'pending'; // 'all' | 'pending' — All Lots vs Pending Lot toggle
+        const TABLE_ROW_LIMIT = 50;      // rows shown while browsing — search always scans ALL lots
+        let tableShowAll = false;        // user pressed "show all" under the table
 
         /* ============== CACHE CONFIG ============== */
         const CACHE_KEY = 'lotDash_MaleLine_cache';
@@ -2341,6 +2406,7 @@
             dashboard.style.display = 'block';
             buildCollectionFilter();
             renderAll();
+            updateLotSliderThumb();
             // Show last-refreshed time in the record pill
             const pill = document.querySelector('.record-pill');
             if (pill) {
@@ -2522,11 +2588,17 @@
                     if (s.disp) completedThrough = s.n; else break;
                 }
             }
+            const overdueRaw = txt(r['Overdue Days']);
+            const shopStage = stages[stages.length - 1]; // n === 7, Shop
             return {
                 raw: r,
                 uniqueId: txt(r['UNIQUE ID']),
                 date: parseDate(r['Date']),
                 overdue: num(r['Overdue Days']),
+                overdueRaw,
+                // Delivered when the sheet writes "Shop-Delivered"-style text into Overdue Days,
+                // or the Shop stage itself shows a received date / pieces.
+                isDelivered: /delivered/i.test(overdueRaw) || !!(shopStage && (shopStage.recv || shopStage.pieces)),
                 itemNo: txt(r['Item No.']),
                 lotNo: txt(r['Lot No.']),
                 meter: num(r['Meter']),
@@ -2539,6 +2611,37 @@
                 currentStage: current,
                 completedThrough
             };
+        }
+
+        /* ============== ALL LOTS / PENDING LOT FILTER ============== */
+        function isLotDelivered(d) {
+            // Reaching the Shop stage (currentStage 7) means the lot is fully delivered.
+            return d.isDelivered || d.currentStage === FINAL_STAGE;
+        }
+
+        // Dataset the current view exposes: collection filter first, then the slider —
+        // "Pending Lot" hides fully-delivered lots from every render; "All Lots" shows everything.
+        function visibleData() {
+            return lotStatusFilter === 'all' ? FILTERED : FILTERED.filter(d => !isLotDelivered(d));
+        }
+
+        function setLotStatusFilter(mode) {
+            lotStatusFilter = mode;
+            const slider = document.getElementById('lotStatusSlider');
+            if (slider) {
+                slider.querySelectorAll('.lot-slider-opt').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+            }
+            updateLotSliderThumb();
+            renderAll();
+        }
+
+        function updateLotSliderThumb() {
+            const slider = document.getElementById('lotStatusSlider');
+            const thumb = slider && slider.querySelector('.lot-slider-thumb');
+            const activeBtn = slider && slider.querySelector('.lot-slider-opt.active');
+            if (!slider || !thumb || !activeBtn) return;
+            thumb.style.width = activeBtn.offsetWidth + 'px';
+            thumb.style.left = activeBtn.offsetLeft + 'px';
         }
 
         /* ============== COLLECTION FILTER ============== */
@@ -2561,11 +2664,12 @@
 
         /* ============== RENDER ============== */
         function renderAll() {
-            document.getElementById('recordCount').textContent = FILTERED.length;
+            const data = visibleData();
+            document.getElementById('recordCount').textContent = data.length;
             renderKPIs();
             renderLotSelect();
             setupSearchMode();
-            if (FILTERED.length) renderLotDetail(FILTERED[0].lotNo);
+            if (data.length) renderLotDetail(data[0].lotNo);
             renderFunnel();
             renderAvgDays();
             renderVendor();
@@ -2575,12 +2679,13 @@
         }
 
         function renderKPIs() {
-            const totalLots = FILTERED.length;
-            const totalPieces = FILTERED.reduce((s, d) => s + d.pieces, 0);
+            const data = visibleData();
+            const totalLots = data.length;
+            const totalPieces = data.reduce((s, d) => s + d.pieces, 0);
             const today = new Date();
-            const inProgress = FILTERED.filter(d => d.currentStage > 0 && d.currentStage < FINAL_STAGE);
+            const inProgress = data.filter(d => d.currentStage > 0 && d.currentStage < FINAL_STAGE);
             const avgDays = inProgress.length ? Math.round(inProgress.reduce((s, d) => s + (d.date ? daysBetween(d.date, today) : 0), 0) / inProgress.length) : 0;
-            const overdue = FILTERED.filter(d => d.overdue > 30).length;
+            const overdue = data.filter(d => d.overdue > 30).length;
 
             document.getElementById('kTotal').textContent = totalLots;
             document.getElementById('kTotalSub').textContent = `${inProgress.length} in progress`;
@@ -2594,7 +2699,7 @@
         function renderLotSelect() {
             const sel = document.getElementById('lotSelect');
             sel.innerHTML = '';
-            const sorted = [...FILTERED].sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
+            const sorted = [...visibleData()].sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
             for (const d of sorted) {
                 const opt = document.createElement('option');
                 opt.value = d.lotNo;
@@ -2605,7 +2710,7 @@
             sel.onchange = () => renderLotDetail(sel.value);
 
             const dl = document.getElementById('articleList');
-            const uniqueArticles = [...new Set(FILTERED.map(d => d.itemNo).filter(Boolean))].sort();
+            const uniqueArticles = [...new Set(visibleData().map(d => d.itemNo).filter(Boolean))].sort();
             dl.innerHTML = uniqueArticles.map(a => `<option value="${a}">`).join('');
         }
 
@@ -2643,7 +2748,7 @@
                 return;
             }
             const q = query.toLowerCase();
-            const hits = FILTERED.filter(d => d.itemNo.toLowerCase().includes(q))
+            const hits = visibleData().filter(d => d.itemNo.toLowerCase().includes(q))
                 .sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
 
             if (!hits.length) {
@@ -2832,7 +2937,7 @@
         function renderFunnel() {
             const counts = STAGES.map(() => 0);
             let done = 0;
-            FILTERED.forEach(d => {
+            visibleData().forEach(d => {
                 if (d.currentStage === 0 && d.completedThrough === FINAL_STAGE) done++;
                 else if (d.currentStage > 0) counts[d.currentStage - 1]++;
             });
@@ -2865,7 +2970,7 @@
 
         function renderAvgDays() {
             const totals = STAGES.map(s => ({ name: s.name, sum: 0, n: 0 }));
-            FILTERED.forEach(d => {
+            visibleData().forEach(d => {
                 d.stages.forEach((s, i) => {
                     if (s.recv && s.disp) {
                         totals[i].sum += daysBetween(s.recv, s.disp);
@@ -2897,7 +3002,7 @@
 
         function renderVendor() {
             const load = {};
-            FILTERED.forEach(d => {
+            visibleData().forEach(d => {
                 d.stages.forEach(s => {
                     if (s.vendor && s.recv && !s.disp) {
                         const key = `${s.vendor} (${s.name})`;
@@ -2948,7 +3053,7 @@
             // Build matrix: { collection: { size: pieces } }
             const matrix = {};
             const sizeSet = new Set();
-            FILTERED.forEach(d => {
+            visibleData().forEach(d => {
                 const c = d.short || 'Unknown';
                 const sz = d.size || '—';
                 matrix[c] = matrix[c] || {};
@@ -3010,10 +3115,17 @@
             const labels = ['Completed', 'In Progress', 'Pending', 'Skipped'];
             const colors = [PALETTE.green, PALETTE.amber, PALETTE.muted, '#e8c7d6'];
 
+            const donutData = visibleData();
             targets.forEach(t => {
                 let done = 0, cur = 0, pending = 0, skip = 0;
-                FILTERED.forEach(d => {
+                donutData.forEach(d => {
                     const s = d.stages[t.stageN - 1];
+                    // Shop is the final stage — nothing dispatches out of it, so a delivered
+                    // lot counts as Completed there, everything else as Pending.
+                    if (t.stageN === FINAL_STAGE) {
+                        if (isLotDelivered(d)) done++; else pending++;
+                        return;
+                    }
                     if (s.isSkipped) skip++;
                     else if (s.disp) done++;
                     else if (s.recv || s.vendor || s.pieces) cur++;
@@ -3030,7 +3142,7 @@
                     font: FONT, margin: { t: 10, b: 10, l: 10, r: 10 },
                     showlegend: false,
                     annotations: [{
-                        text: `<b style="font-size:22px">${FILTERED.length}</b><br><span style="font-size:11px;color:${PALETTE.muted}">lots</span>`,
+                        text: `<b style="font-size:22px">${donutData.length}</b><br><span style="font-size:11px;color:${PALETTE.muted}">lots</span>`,
                         showarrow: false, font: { family: 'Poppins', size: 14, color: PALETTE.text }
                     }],
                     height: 280
@@ -3043,8 +3155,8 @@
             const queryInput = document.getElementById('overdueSearch');
             const query = (queryInput.value || '').trim().toLowerCase();
 
-            let allRows = FILTERED
-                .filter(d => d.currentStage > 0 && d.currentStage < FINAL_STAGE)
+            let allRows = visibleData()
+                .filter(d => d.currentStage > 0)
                 .map(d => {
                     const cur = d.stages.find(s => s.n === d.currentStage);
                     const daysHere = cur && cur.recv ? daysBetween(cur.recv, today) : 0;
@@ -3064,17 +3176,24 @@
                 });
             }
 
-            allRows.sort((a, b) => b.d.overdue - a.d.overdue);
+            // Delivered lots (visible in "All Lots" mode) sort last; rest by overdue days
+            allRows.sort((a, b) => {
+                const aDel = isLotDelivered(a.d), bDel = isLotDelivered(b.d);
+                if (aDel !== bDel) return aDel ? 1 : -1;
+                return b.d.overdue - a.d.overdue;
+            });
+            const totalMatches = allRows.length;
 
-            // When searching, show all matches; otherwise cap at 12 to keep dashboard tight
-            const rows = query ? allRows : allRows.slice(0, 12);
+            // Cap rendered rows only while plain browsing — an active search renders every match
+            const capped = !query && !tableShowAll && totalMatches > TABLE_ROW_LIMIT;
+            const rows = capped ? allRows.slice(0, TABLE_ROW_LIMIT) : allRows;
 
             // Update subtitle to reflect what's being shown
             const sub = document.getElementById('overdueSubtitle');
             if (query) {
-                sub.textContent = `— ${allRows.length} result${allRows.length === 1 ? '' : 's'} for "${query}"`;
+                sub.textContent = `— ${totalMatches} result${totalMatches === 1 ? '' : 's'} for "${query}"`;
             } else {
-                sub.textContent = `— sorted by overdue days · top 12`;
+                sub.textContent = `— sorted by overdue days`;
             }
 
             const body = document.getElementById('overdueBody');
@@ -3084,7 +3203,9 @@
                 return;
             }
             body.innerHTML = rows.map(({ d, cur, daysHere }) => {
-                const chip = d.overdue > 35 ? 'overdue' : d.overdue > 20 ? 'warn' : 'ok';
+                const delivered = isLotDelivered(d);
+                const chip = delivered ? 'delivered' : (d.overdue > 35 ? 'overdue' : d.overdue > 20 ? 'warn' : 'ok');
+                const overdueLabel = delivered ? 'Shop Delivered' : `${d.overdue} days`;
                 const collClass = (d.short || '').toLowerCase() === 'glanza' ? 'glanza' :
                     (d.short || '').toLowerCase() === 'resort' ? 'resort' : 'other';
                 const collCell = d.short ? `<span class="collection-badge ${collClass}">${d.short}</span>` : '—';
@@ -3096,9 +3217,27 @@
       <td>${d.pieces.toLocaleString('en-IN')}</td>
       <td>${cur ? cur.name : '—'}${cur && cur.vendor ? ' · ' + cur.vendor : ''}</td>
       <td>${daysHere || '—'}</td>
-      <td><span class="chip ${chip}">${d.overdue} days</span></td>
+      <td><span class="chip ${chip}">${overdueLabel}</span></td>
     </tr>`;
             }).join('');
+
+            // Footer: "show all" when capped, or "show first N" when expanded
+            if (capped) {
+                body.innerHTML += `<tr class="table-note-row"><td colspan="8" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">
+                    Showing first ${TABLE_ROW_LIMIT} of ${totalMatches} lots — search finds any lot, or
+                    <a href="javascript:void(0)" onclick="toggleTableShowAll(true)" style="color:var(--rose);font-weight:600;">show all ${totalMatches}</a>
+                </td></tr>`;
+            } else if (tableShowAll && !query && totalMatches > TABLE_ROW_LIMIT) {
+                body.innerHTML += `<tr class="table-note-row"><td colspan="8" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">
+                    Showing all ${totalMatches} lots —
+                    <a href="javascript:void(0)" onclick="toggleTableShowAll(false)" style="color:var(--rose);font-weight:600;">show first ${TABLE_ROW_LIMIT} only</a>
+                </td></tr>`;
+            }
+        }
+
+        function toggleTableShowAll(on) {
+            tableShowAll = on;
+            renderOverdueTable();
         }
 
         /* Wire up the overdue-table search box once at load */
