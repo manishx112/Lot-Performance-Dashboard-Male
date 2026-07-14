@@ -1484,6 +1484,95 @@
             color: var(--teal);
         }
 
+        .chip.neutral {
+            background: #fdf2f7;
+            color: var(--muted);
+        }
+
+        /* ---- CHART ↔ TABLE CROSS-FILTER ---- */
+        #overdueTableCard { scroll-margin-top: 24px; }
+
+        @keyframes filterPulse {
+            0%   { box-shadow: 0 0 0 0 rgba(245,158,11,.65), 0 2px 10px rgba(245,158,11,.35); }
+            65%  { box-shadow: 0 0 0 10px rgba(245,158,11,0), 0 2px 10px rgba(245,158,11,.1); }
+            100% { box-shadow: 0 0 0 0 rgba(245,158,11,0), 0 2px 10px rgba(245,158,11,.35); }
+        }
+        @keyframes filterSlideIn {
+            from { opacity:0; transform: translateY(-8px) scale(.88); }
+            to   { opacity:1; transform: translateY(0) scale(1); }
+        }
+        .filter-btn {
+            display: inline-flex; align-items: center; gap: 9px;
+            background: linear-gradient(135deg,#f59e0b 0%,#d97706 100%);
+            color: #fff; font-family: inherit; border: none; border-radius: 11px;
+            padding: 8px 13px 8px 11px; cursor: pointer; user-select: none;
+            animation: filterSlideIn .24s cubic-bezier(.34,1.56,.64,1) both,
+                       filterPulse 2.2s ease-out .5s infinite;
+            box-shadow: 0 2px 10px rgba(245,158,11,.4);
+            transition: background .18s, transform .12s, box-shadow .15s;
+        }
+        .filter-btn:hover {
+            background: linear-gradient(135deg,#ef4444 0%,#dc2626 100%);
+            animation: none;
+            transform: scale(1.04);
+            box-shadow: 0 3px 14px rgba(239,68,68,.45);
+        }
+        .filter-btn:active { transform: scale(.96); }
+        .filter-btn-body { display:flex; flex-direction:column; line-height:1.15; text-align:left; }
+        .filter-btn-type { font-size:9px; font-weight:800; letter-spacing:.8px; opacity:.8; text-transform:uppercase; }
+        .filter-btn-value { font-size:14px; font-weight:800; letter-spacing:.2px; }
+        .filter-btn-count {
+            font-size:10.5px; font-weight:700; opacity:.9; white-space:nowrap;
+            background:rgba(255,255,255,.2); border-radius:6px; padding:2px 7px;
+        }
+        .filter-btn-sep { width:1px; height:26px; background:rgba(255,255,255,.25); flex-shrink:0; }
+        .filter-btn-close {
+            width:19px; height:19px; flex-shrink:0; border-radius:50%;
+            background:rgba(255,255,255,.18); display:inline-flex;
+            align-items:center; justify-content:center;
+            transition:background .15s; margin-left:1px;
+        }
+        .filter-btn:hover .filter-btn-close { background:rgba(255,255,255,.35); }
+
+        /* Status + person filter bars (below table header) */
+        .person-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 14px; }
+        .person-bar .pb-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; width:100%; }
+        .person-bar .pb-label {
+            font-size:11px; font-weight:700; color:var(--muted);
+            text-transform:uppercase; letter-spacing:.05em; margin-right:2px;
+        }
+        .person-btn {
+            font-family:inherit; border:1.5px solid var(--border); background:white;
+            color:var(--muted); border-radius:999px; padding:6px 14px;
+            font-size:12px; font-weight:600; cursor:pointer; transition:all .15s;
+        }
+        .person-btn:hover { border-color:var(--rose); color:var(--rose); }
+        .person-btn.active { background:var(--rose); border-color:var(--rose); color:#fff; }
+        .person-btn .pb-count { opacity:.75; font-weight:500; margin-left:5px; font-size:11px; }
+        .kpi.clickable { cursor:pointer; }
+        .kpi.clickable:active { transform:translateY(-1px) scale(.99); }
+
+        #monthFilter {
+            font-family: inherit;
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            min-width: 130px;
+            cursor: pointer;
+        }
+        #monthFilter:focus {
+            outline: none;
+            border-color: var(--rose);
+            box-shadow: 0 0 0 3px var(--rose-tint);
+        }
+
+        /* clickable bar cursor on charts */
+        .nsewdrag { cursor: pointer !important; }
+
         /* ---------- ANIMATIONS ---------- */
         @keyframes fadeUp {
             from {
@@ -1834,6 +1923,67 @@
                 min-width: 0;
                 max-width: none;
             }
+
+            /* ---- Bottom table filter controls: full-width, thumb-friendly ---- */
+            #overdueTableCard .tracker-header > div {
+                width: 100%;
+            }
+
+            #overdueSearch {
+                font-size: 16px; /* prevents iPhone auto-zoom on focus */
+                padding-top: 10px;
+                padding-bottom: 10px;
+            }
+
+            #monthFilter {
+                width: 100%;
+                font-size: 16px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+            }
+
+            /* Active-filter pills become full-width rows */
+            #filterPills {
+                display: flex !important;
+                flex-direction: column;
+                width: 100%;
+                gap: 8px;
+            }
+
+            #filterPills .filter-btn {
+                width: 100%;
+                justify-content: space-between;
+                padding: 12px 14px;
+            }
+
+            #filterPills .reset-btn {
+                width: 100%;
+                padding: 11px;
+            }
+
+            /* Status + person buttons: bigger touch targets */
+            .person-bar {
+                gap: 9px;
+            }
+
+            .person-bar .pb-label {
+                width: 100%;
+            }
+
+            .person-btn {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+
+            /* Table swipe hint for phones */
+            .table-wrap::after {
+                content: "← Swipe the table sideways to see all columns →";
+                display: block;
+                text-align: center;
+                font-size: 11px;
+                color: var(--muted);
+                padding: 10px 0 2px;
+            }
         }
 
         /* ---------- SMALL PHONES (<=420px) ---------- */
@@ -2048,7 +2198,7 @@
                     <div class="kpi-body"><span class="kpi-label">Avg Pipeline Days</span><span class="kpi-value"
                             id="kAvgDays">0</span><span class="kpi-sub">date → current stage</span></div>
                 </div>
-                <div class="kpi coral fadeUp" style="animation-delay:.26s">
+                <div class="kpi coral clickable fadeUp" style="animation-delay:.26s" onclick="toggleOverdueFilter()" title="Click to see overdue lots in the table below">
                     <div class="kpi-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path
@@ -2107,7 +2257,7 @@
             <div class="row r2">
                 <div class="chart-card fadeUp" style="animation-delay:.40s">
                     <h3>Lots Currently At Each Stage</h3>
-                    <div class="sub">Where your production is sitting right now</div>
+                    <div class="sub">Where your production is sitting right now — 👆 tap a bar to see those lots below</div>
                     <div id="chartFunnel" class="chart"></div>
                 </div>
                 <div class="chart-card fadeUp" style="animation-delay:.47s">
@@ -2121,7 +2271,7 @@
             <div class="row r2">
                 <div class="chart-card fadeUp" style="animation-delay:.54s">
                     <h3>Vendor Load (Pieces In-Flight)</h3>
-                    <div class="sub">Who's holding your stock right now — by partner and stage</div>
+                    <div class="sub">Who's holding your stock — 👆 tap a bar to see their lots below</div>
                     <div id="chartVendor" class="chart"></div>
                 </div>
                 <div class="chart-card fadeUp" style="animation-delay:.61s">
@@ -2135,17 +2285,17 @@
             <div class="row r3">
                 <div class="chart-card fadeUp" style="animation-delay:.68s">
                     <h3>Embroidery Stage</h3>
-                    <div class="sub">Done · Current · Pending · Skipped</div>
+                    <div class="sub">👆 Tap a slice to see those lots below</div>
                     <div id="chartStage2" class="chart" style="height:280px;"></div>
                 </div>
                 <div class="chart-card fadeUp" style="animation-delay:.75s">
                     <h3>Fabrication Stage</h3>
-                    <div class="sub">Done · Current · Pending — typically the longest stage</div>
+                    <div class="sub">👆 Tap a slice to see those lots below</div>
                     <div id="chartStage3" class="chart" style="height:280px;"></div>
                 </div>
                 <div class="chart-card fadeUp" style="animation-delay:.82s">
                     <h3>Kaj Stage</h3>
-                    <div class="sub">Done · Current · Pending</div>
+                    <div class="sub">👆 Tap a slice to see those lots below</div>
                     <div id="chartStage4" class="chart" style="height:280px;"></div>
                 </div>
             </div>
@@ -2154,35 +2304,42 @@
             <div class="row r3">
                 <div class="chart-card fadeUp" style="animation-delay:.86s">
                     <h3>Washing Stage</h3>
-                    <div class="sub">Done · Current · Pending — Anoop's load</div>
+                    <div class="sub">👆 Tap a slice to see those lots below</div>
                     <div id="chartStage5" class="chart" style="height:280px;"></div>
                 </div>
                 <div class="chart-card fadeUp" style="animation-delay:.90s">
                     <h3>Packing Stage</h3>
-                    <div class="sub">Done · Current · Pending — ready for shop</div>
+                    <div class="sub">👆 Tap a slice to see those lots below</div>
                     <div id="chartStage6" class="chart" style="height:280px;"></div>
                 </div>
                 <div class="chart-card fadeUp" style="animation-delay:.94s">
                     <h3>Shop Stage</h3>
-                    <div class="sub">Delivered · In transit · Pending</div>
+                    <div class="sub">Delivered vs Pending — 👆 tap a slice to see lots</div>
                     <div id="chartStage7" class="chart" style="height:280px;"></div>
                 </div>
             </div>
 
             <!-- OVERDUE TABLE -->
-            <div class="tracker-card fadeUp" style="animation-delay:.98s">
+            <div class="tracker-card fadeUp" id="overdueTableCard" style="animation-delay:.98s">
                 <div class="tracker-header">
                     <h3>Overdue &amp; Risk Lots <span id="overdueSubtitle">— sorted by overdue days</span></h3>
-                    <div class="search-input-wrap">
-                        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="11" cy="11" r="8" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg>
-                        <input type="text" id="overdueSearch" placeholder="Search lot, item, vendor, stage…"
-                            autocomplete="off" />
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <div id="filterPills" style="display:contents;"></div>
+                        <select id="monthFilter" onchange="setMonthFilter(this.value)">
+                            <option value="">All Months</option>
+                        </select>
+                        <div class="search-input-wrap">
+                            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                            <input type="text" id="overdueSearch" placeholder="Search lot, item, vendor, stage…"
+                                autocomplete="off" />
+                        </div>
                     </div>
                 </div>
+                <div id="personFilterBar" class="person-bar" style="display:none;"></div>
                 <div class="table-wrap">
                     <table class="lot-table">
                         <thead>
@@ -2193,6 +2350,7 @@
                                 <th>Size</th>
                                 <th>Pieces</th>
                                 <th>Current Stage</th>
+                                <th>Received On</th>
                                 <th>Days Stuck</th>
                                 <th>Overdue</th>
                             </tr>
@@ -2241,6 +2399,18 @@
         let lotStatusFilter = 'pending'; // 'all' | 'pending' — All Lots vs Pending Lot toggle
         const TABLE_ROW_LIMIT = 50;      // rows shown while browsing — search always scans ALL lots
         let tableShowAll = false;        // user pressed "show all" under the table
+
+        // All table filters combine (AND) — stage from funnel, status from donuts/quick
+        // buttons, person buttons, vendor chart, month dropdown, overdue KPI.
+        let tableFilters = {
+            stage: null,        // stage number 1-7 (funnel / donut click)
+            status: null,       // 'done' | 'current' | 'pending' | 'skipped'
+            person: null,       // vendor name at the filtered stage (person buttons)
+            vendor: null,       // current-stage vendor (vendor chart click)
+            month: null,        // 'YYYY-MM' of lot Date (month dropdown)
+            overdueOnly: false  // >30 days overdue (KPI card click)
+        };
+        const STATUS_LABELS = { done: 'Completed', current: 'Pending here', pending: 'Not started', skipped: 'Skipped' };
 
         /* ============== CACHE CONFIG ============== */
         const CACHE_KEY = 'lotDash_MaleLine_cache';
@@ -2675,6 +2845,7 @@
             renderVendor();
             renderCollection();
             renderStageDonuts();
+            renderMonthFilter();
             renderOverdueTable();
         }
 
@@ -2693,7 +2864,7 @@
             document.getElementById('kPiecesSub').textContent = ACTIVE_COLLECTION === 'All' ? 'across all lots' : `in ${ACTIVE_COLLECTION} collection`;
             document.getElementById('kAvgDays').textContent = avgDays;
             document.getElementById('kOverdue').textContent = overdue;
-            document.getElementById('kOverdueSub').textContent = `>30 days overdue`;
+            document.getElementById('kOverdueSub').textContent = `>30 days — tap to view`;
         }
 
         function renderLotSelect() {
@@ -2942,7 +3113,7 @@
                 else if (d.currentStage > 0) counts[d.currentStage - 1]++;
             });
             const labels = STAGES.map(s => s.name);
-            const colors = [PALETTE.plum, PALETTE.magenta, PALETTE.amber, PALETTE.rose, PALETTE.teal, PALETTE.green, PALETTE.coral];
+            const colors = funnelColors();
             const trace = {
                 type: 'bar', orientation: 'h',
                 x: counts, y: labels,
@@ -2966,6 +3137,23 @@
                 height: 320,
                 bargap: 0.35
             }, COMMON_CONFIG);
+
+            // Click a stage bar → filter the bottom table to that stage's lots
+            const gd = document.getElementById('chartFunnel');
+            if (gd && typeof gd.on === 'function') {
+                gd.on('plotly_click', function (eventData) {
+                    if (eventData && eventData.points && eventData.points[0]) {
+                        const stage = STAGES.find(s => s.name.toLowerCase() === String(eventData.points[0].y).toLowerCase());
+                        if (stage) setStageFilter(stage.n);
+                    }
+                });
+            }
+        }
+
+        function funnelColors() {
+            const base = [PALETTE.plum, PALETTE.magenta, PALETTE.amber, PALETTE.rose, PALETTE.teal, PALETTE.green, PALETTE.coral];
+            if (!tableFilters.stage) return base;
+            return STAGES.map((s, i) => s.n === tableFilters.stage ? base[i] : 'rgba(122,100,112,0.22)');
         }
 
         function renderAvgDays() {
@@ -3015,10 +3203,18 @@
                 document.getElementById('chartVendor').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:280px;color:var(--muted);font-size:13px">No in-flight vendor load right now</div>';
                 return;
             }
+            const vendorNames = entries.map(e => e[0].replace(/\s*\([^)]*\)\s*$/, ''));
             const trace = {
                 type: 'bar', orientation: 'h',
                 y: entries.map(e => e[0]), x: entries.map(e => e[1]),
-                marker: { color: PALETTE.rose, line: { width: 0 } },
+                customdata: vendorNames,
+                marker: {
+                    color: vendorNames.map(n => {
+                        if (!tableFilters.vendor) return PALETTE.rose;
+                        return n.trim() === tableFilters.vendor.trim() ? '#f59e0b' : 'rgba(190,24,93,0.18)';
+                    }),
+                    line: { width: 0 }
+                },
                 text: entries.map(e => e[1].toLocaleString('en-IN')),
                 textposition: 'outside',
                 textfont: { family: 'Poppins', size: 12, color: PALETTE.text, weight: 600 },
@@ -3046,6 +3242,17 @@
                 height: 320,
                 bargap: 0.35
             }, COMMON_CONFIG);
+
+            // Click a vendor bar → filter the bottom table to that vendor's lots
+            const vgd = document.getElementById('chartVendor');
+            if (vgd && typeof vgd.on === 'function') {
+                vgd.on('plotly_click', function (data) {
+                    if (!data.points || !data.points[0]) return;
+                    const vendor = (data.points[0].customdata || '').trim() ||
+                                   String(data.points[0].y || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+                    if (vendor) setVendorFilter(vendor);
+                });
+            }
         }
 
         /* Stacked bar: pieces by collection (Short), broken down by size. */
@@ -3147,20 +3354,315 @@
                     }],
                     height: 280
                 }, COMMON_CONFIG);
+
+                // Click a slice → filter the bottom table to that stage + status
+                const dgd = document.getElementById(t.divId);
+                if (dgd && typeof dgd.on === 'function') {
+                    dgd.on('plotly_click', function (ev) {
+                        if (!ev.points || !ev.points[0]) return;
+                        const map = { 'Completed': 'done', 'In Progress': 'current', 'Pending': 'pending', 'Skipped': 'skipped' };
+                        const status = map[ev.points[0].label];
+                        if (status) setStageStatusFilter(t.stageN, status);
+                    });
+                }
             });
+        }
+
+        /* ============== CROSS-FILTER (charts + KPI → table) ============== */
+        // Status of a lot AT a given stage — mirrors the donut counting logic exactly
+        function stageStatus(d, stageN) {
+            if (stageN === FINAL_STAGE) return isLotDelivered(d) ? 'done' : 'pending';
+            const s = d.stages[stageN - 1];
+            if (s.isSkipped) return 'skipped';
+            if (s.disp) return 'done';
+            if (s.recv || s.vendor || s.pieces) return 'current';
+            return 'pending';
+        }
+
+        function anyTableFilter() {
+            const f = tableFilters;
+            return !!(f.stage || f.status || f.person || f.vendor || f.month || f.overdueOnly);
+        }
+
+        // ALL filters combine (AND). `ignore` lets the status/person bars count lots
+        // matching everything except the filter they themselves control.
+        function lotMatchesFilters(d, cur, ignore = {}) {
+            const f = tableFilters;
+            if (!ignore.stage && f.stage) {
+                const st = stageStatus(d, f.stage);
+                if (!ignore.status && f.status) {
+                    if (st !== f.status) return false;
+                } else {
+                    // Stage filter without a status: lots AT the stage now, PLUS lots
+                    // that already finished it — those get a "✓ Done → next stage" tag
+                    if (st !== 'current' && st !== 'done') return false;
+                }
+            }
+            if (!ignore.person && f.person && f.stage) {
+                const v = (d.stages[f.stage - 1].vendor || '').trim().toLowerCase();
+                if (v !== f.person.trim().toLowerCase()) return false;
+            }
+            if (!ignore.vendor && f.vendor) {
+                const v = (cur && cur.vendor ? cur.vendor : '').trim().toLowerCase();
+                if (v !== f.vendor.trim().toLowerCase()) return false;
+            }
+            if (!ignore.month && f.month) {
+                if (!d.date) return false;
+                const key = d.date.getFullYear() + '-' + String(d.date.getMonth() + 1).padStart(2, '0');
+                if (key !== f.month) return false;
+            }
+            if (!ignore.overdue && f.overdueOnly) {
+                if (isLotDelivered(d) || d.overdue <= 30) return false;
+            }
+            return true;
+        }
+
+        // Real piece count for the context being viewed — stages sometimes receive
+        // 1-2 pcs less than the lot started with (damage/shortage).
+        function lotEffectivePieces(d) {
+            const f = tableFilters;
+            if (f.stage) {
+                const s = d.stages[f.stage - 1];
+                const st = stageStatus(d, f.stage);
+                if ((st === 'done' || st === 'current') && s && s.pieces) return s.pieces;
+                return d.pieces; // stage not reached yet — nothing lost yet
+            }
+            const cur = d.stages.find(s => s.n === d.currentStage);
+            return (cur && cur.pieces) ? cur.pieces : d.pieces;
+        }
+
+        function refreshFilteredViews(scroll) {
+            renderOverdueTable();
+            applyChartHighlight();
+            if (scroll) {
+                setTimeout(() => {
+                    const el = document.getElementById('overdueTableCard');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+            }
+        }
+
+        // Funnel bar click
+        function setStageFilter(stageN) {
+            const f = tableFilters;
+            if (f.stage === stageN && !f.status) {
+                f.stage = null; f.person = null;
+                refreshFilteredViews(false);
+                return;
+            }
+            f.stage = stageN; f.status = null; f.person = null;
+            refreshFilteredViews(true);
+        }
+
+        // Donut slice click — stage + Completed / In Progress / Pending / Skipped
+        function setStageStatusFilter(stageN, status) {
+            const f = tableFilters;
+            if (f.stage === stageN && f.status === status) {
+                f.stage = null; f.status = null; f.person = null;
+                refreshFilteredViews(false);
+                return;
+            }
+            f.stage = stageN; f.status = status; f.person = null;
+            refreshFilteredViews(true);
+        }
+
+        // Quick status buttons — direct answer to "how many pcs pending at this stage?"
+        function setStatusFilter(status) {
+            tableFilters.status = status;
+            refreshFilteredViews(false);
+        }
+
+        // Person buttons under the table header ('' = All)
+        function setPersonFilter(name) {
+            tableFilters.person = name || null;
+            refreshFilteredViews(false);
+        }
+
+        // Vendor chart click (toggles)
+        function setVendorFilter(vendor) {
+            const f = tableFilters;
+            if (f.vendor && f.vendor.trim() === vendor.trim()) {
+                f.vendor = null;
+                refreshFilteredViews(false);
+                return;
+            }
+            f.vendor = vendor;
+            refreshFilteredViews(true);
+        }
+
+        function setMonthFilter(val) {
+            tableFilters.month = val || null;
+            refreshFilteredViews(false);
+        }
+
+        // Overdue Lots KPI card click
+        function toggleOverdueFilter() {
+            tableFilters.overdueOnly = !tableFilters.overdueOnly;
+            refreshFilteredViews(tableFilters.overdueOnly);
+        }
+
+        function clearFilterKey(key) {
+            const f = tableFilters;
+            if (key === 'stage') { f.stage = null; f.status = null; f.person = null; }
+            else if (key === 'status') { f.status = null; }
+            else if (key === 'person') { f.person = null; }
+            else if (key === 'overdue') { f.overdueOnly = false; }
+            else { f[key] = null; }
+            if (key === 'month') {
+                const sel = document.getElementById('monthFilter');
+                if (sel) sel.value = '';
+            }
+            refreshFilteredViews(false);
+        }
+
+        function clearAllFilters() {
+            tableFilters = { stage: null, status: null, person: null, vendor: null, month: null, overdueOnly: false };
+            const sel = document.getElementById('monthFilter');
+            if (sel) sel.value = '';
+            refreshFilteredViews(false);
+        }
+
+        function applyChartHighlight() {
+            if (!window.Plotly) return;
+            const fe = document.getElementById('chartFunnel');
+            if (fe && fe.data && fe.data[0]) {
+                Plotly.restyle('chartFunnel', { 'marker.color': [funnelColors()] });
+            }
+            const ve = document.getElementById('chartVendor');
+            if (ve && ve.data && ve.data[0]) {
+                const cd = ve.data[0].customdata || ve.data[0].y;
+                const colors = cd.map(n => {
+                    if (!tableFilters.vendor) return PALETTE.rose;
+                    return String(n).trim() === tableFilters.vendor.trim() ? '#f59e0b' : 'rgba(190,24,93,0.18)';
+                });
+                Plotly.restyle('chartVendor', { 'marker.color': [colors] });
+            }
+        }
+
+        // One removable pill per active filter, shown in the table header
+        function renderFilterPills(matchCount, pieceSum) {
+            const wrap = document.getElementById('filterPills');
+            if (!wrap) return;
+            const f = tableFilters;
+            const pills = [];
+            if (f.stage) {
+                const st = STAGES.find(s => s.n === f.stage);
+                pills.push({ type: 'STAGE', value: (st ? st.name : f.stage) + (f.status ? ' · ' + STATUS_LABELS[f.status] : ''), key: 'stage' });
+            }
+            if (f.person) pills.push({ type: 'PERSON', value: f.person, key: 'person' });
+            if (f.vendor) pills.push({ type: 'VENDOR', value: f.vendor, key: 'vendor' });
+            if (f.overdueOnly) pills.push({ type: 'STATUS', value: 'Overdue >30d', key: 'overdue' });
+            if (!pills.length) { wrap.innerHTML = ''; return; }
+
+            const closeSvg = '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            wrap.innerHTML = pills.map((p, i) => `
+                <button class="filter-btn" onclick="clearFilterKey('${p.key}')" title="Remove this filter">
+                    <span class="filter-btn-body">
+                        <span class="filter-btn-type">${p.type}</span>
+                        <span class="filter-btn-value">${p.value}</span>
+                    </span>
+                    ${i === 0 ? `<span class="filter-btn-count">${matchCount} lot${matchCount !== 1 ? 's' : ''} · ${pieceSum.toLocaleString('en-IN')} pcs</span>` : ''}
+                    <span class="filter-btn-sep"></span>
+                    <span class="filter-btn-close">${closeSvg}</span>
+                </button>`).join('') +
+                (pills.length > 1 ? `<button class="reset-btn" onclick="clearAllFilters()" style="font-size:12px;">✕ Clear all</button>` : '');
+        }
+
+        // Two rows above the table when a stage filter is active:
+        //   "Show: All | ⏳ Pending Here | ✓ Completed"  (each with lots · pcs)
+        //   "Washing by: All | Anoop | …"
+        function renderPersonBar() {
+            const bar = document.getElementById('personFilterBar');
+            if (!bar) return;
+            const f = tableFilters;
+            if (!f.stage) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+            const stage = STAGES.find(s => s.n === f.stage);
+            const base = visibleData();
+            const fmtP = v => v.toLocaleString('en-IN');
+
+            // Status row — counts respect every other filter but not the status itself
+            const agg = { current: { n: 0, p: 0 }, done: { n: 0, p: 0 }, pending: { n: 0, p: 0 }, skipped: { n: 0, p: 0 } };
+            base.forEach(d => {
+                const cur = d.stages.find(s => s.n === d.currentStage);
+                if (!lotMatchesFilters(d, cur, { stage: true })) return;
+                const st = stageStatus(d, f.stage);
+                agg[st].n++; agg[st].p += lotEffectivePieces(d) || 0;
+            });
+            const allN = agg.current.n + agg.done.n, allP = agg.current.p + agg.done.p;
+            const sBtn = (label, status, a, active) =>
+                `<button class="person-btn ${active ? 'active' : ''}" onclick="setStatusFilter(${status ? `'${status}'` : 'null'})">${label}<span class="pb-count">${a.n} · ${fmtP(a.p)} pcs</span></button>`;
+            let statusRow = `<span class="pb-label">Show:</span>` +
+                sBtn('All', null, { n: allN, p: allP }, !f.status) +
+                sBtn('⏳ Pending Here', 'current', agg.current, f.status === 'current') +
+                sBtn('✓ Completed', 'done', agg.done, f.status === 'done');
+            if (f.status === 'pending') statusRow += sBtn('Not Reached Yet', 'pending', agg.pending, true);
+            if (f.status === 'skipped') statusRow += sBtn('Skipped', 'skipped', agg.skipped, true);
+
+            // Person row — everyone who worked this stage among the matching lots
+            const counts = {};
+            let total = 0;
+            base.forEach(d => {
+                const cur = d.stages.find(s => s.n === d.currentStage);
+                if (!lotMatchesFilters(d, cur, { person: true })) return;
+                total++;
+                const v = (d.stages[f.stage - 1].vendor || '').trim();
+                if (v) counts[v] = (counts[v] || 0) + 1;
+            });
+            const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            const personRow = `<span class="pb-label">${stage ? stage.name : ''} by:</span>
+                <button class="person-btn ${!f.person ? 'active' : ''}" onclick="setPersonFilter('')">All<span class="pb-count">${total}</span></button>` +
+                names.map(n => {
+                    const active = f.person && f.person.trim().toLowerCase() === n.toLowerCase();
+                    return `<button class="person-btn ${active ? 'active' : ''}" onclick="setPersonFilter('${n.replace(/'/g, "\\'")}')">${n}<span class="pb-count">${counts[n]}</span></button>`;
+                }).join('');
+
+            bar.style.display = '';
+            bar.innerHTML = `<div class="pb-row">${statusRow}</div><div class="pb-row">${personRow}</div>`;
+        }
+
+        // Month dropdown options — built from the lot Dates present in the data
+        function renderMonthFilter() {
+            const sel = document.getElementById('monthFilter');
+            if (!sel) return;
+            const keys = new Set();
+            DATA.forEach(d => {
+                if (d.date) keys.add(d.date.getFullYear() + '-' + String(d.date.getMonth() + 1).padStart(2, '0'));
+            });
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const now = new Date();
+            const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            sel.innerHTML = '<option value="">All Months</option>' + [...keys].sort().reverse().map(k => {
+                const [y, m] = k.split('-');
+                const label = monthNames[+m - 1] + ' ' + y + (k === thisMonth ? ' (this month)' : '');
+                return `<option value="${k}">${label}</option>`;
+            }).join('');
+            sel.value = tableFilters.month || '';
+        }
+
+        // Tapping a table row jumps to that lot's full pipeline tracker at the top
+        function selectAndScrollToLot(lotNo) {
+            const sel = document.getElementById('lotSelect');
+            if (sel) {
+                sel.value = lotNo;
+                if (sel.onchange) sel.onchange();
+            }
+            const tracker = document.querySelector('.tracker-card');
+            if (tracker) tracker.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function renderOverdueTable() {
             const today = new Date();
             const queryInput = document.getElementById('overdueSearch');
             const query = (queryInput.value || '').trim().toLowerCase();
+            const hasFilter = anyTableFilter();
 
             let allRows = visibleData()
-                .filter(d => d.currentStage > 0)
+                // Untouched lots (currentStage 0) only appear when a "Pending" filter can match them
+                .filter(d => d.currentStage > 0 || (hasFilter && lotMatchesFilters(d, null)))
                 .map(d => {
                     const cur = d.stages.find(s => s.n === d.currentStage);
                     const daysHere = cur && cur.recv ? daysBetween(cur.recv, today) : 0;
-                    return { d, cur, daysHere };
+                    return { d, cur, daysHere, match: hasFilter ? lotMatchesFilters(d, cur) : false };
                 });
 
             // Apply search across multiple fields
@@ -3176,21 +3678,35 @@
                 });
             }
 
-            // Delivered lots (visible in "All Lots" mode) sort last; rest by overdue days
+            // Count + pieces of matching lots (for the filter pills)
+            const matched = allRows.filter(r => r.match);
+            const matchCount = matched.length;
+            const matchPieces = matched.reduce((s, r) => s + (lotEffectivePieces(r.d) || 0), 0);
+
+            // With any filter active the table shows only the matching lots
+            if (hasFilter) allRows = matched;
+
             allRows.sort((a, b) => {
+                // With a stage filter: lots still AT the stage first, finished ones after
+                if (tableFilters.stage) {
+                    const rank = x => ({ current: 0, done: 1, pending: 2, skipped: 3 })[stageStatus(x.d, tableFilters.stage)];
+                    const ra = rank(a), rb = rank(b);
+                    if (ra !== rb) return ra - rb;
+                }
                 const aDel = isLotDelivered(a.d), bDel = isLotDelivered(b.d);
                 if (aDel !== bDel) return aDel ? 1 : -1;
                 return b.d.overdue - a.d.overdue;
             });
             const totalMatches = allRows.length;
 
-            // Cap rendered rows only while plain browsing — an active search renders every match
-            const capped = !query && !tableShowAll && totalMatches > TABLE_ROW_LIMIT;
+            // Cap rendered rows only while plain browsing — search/filter renders every match
+            const capped = !query && !hasFilter && !tableShowAll && totalMatches > TABLE_ROW_LIMIT;
             const rows = capped ? allRows.slice(0, TABLE_ROW_LIMIT) : allRows;
 
-            // Update subtitle to reflect what's being shown
             const sub = document.getElementById('overdueSubtitle');
-            if (query) {
+            if (hasFilter) {
+                sub.textContent = `— ${matchCount} lot${matchCount === 1 ? '' : 's'} match your filters`;
+            } else if (query) {
                 sub.textContent = `— ${totalMatches} result${totalMatches === 1 ? '' : 's'} for "${query}"`;
             } else {
                 sub.textContent = `— sorted by overdue days`;
@@ -3198,41 +3714,80 @@
 
             const body = document.getElementById('overdueBody');
             if (!rows.length) {
-                const msg = query ? `No lots match "${query}".` : 'No in-flight lots to review.';
-                body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">${msg}</td></tr>`;
-                return;
-            }
-            body.innerHTML = rows.map(({ d, cur, daysHere }) => {
-                const delivered = isLotDelivered(d);
-                const chip = delivered ? 'delivered' : (d.overdue > 35 ? 'overdue' : d.overdue > 20 ? 'warn' : 'ok');
-                const overdueLabel = delivered ? 'Shop Delivered' : `${d.overdue} days`;
-                const collClass = (d.short || '').toLowerCase() === 'glanza' ? 'glanza' :
-                    (d.short || '').toLowerCase() === 'resort' ? 'resort' : 'other';
-                const collCell = d.short ? `<span class="collection-badge ${collClass}">${d.short}</span>` : '—';
-                return `<tr>
+                const msg = query ? `No lots match "${query}".` :
+                    hasFilter ? `No lots match these filters — <a href="javascript:void(0)" onclick="clearAllFilters()" style="color:var(--rose);font-weight:600;">clear filters</a>` :
+                    'No in-flight lots to review.';
+                body.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">${msg}</td></tr>`;
+            } else {
+                body.innerHTML = rows.map(({ d, cur, daysHere, match }) => {
+                    const delivered = isLotDelivered(d);
+                    const chip = delivered ? 'delivered' : (d.overdue > 35 ? 'overdue' : d.overdue > 20 ? 'warn' : 'ok');
+                    const overdueLabel = delivered ? 'Shop Delivered' : `${d.overdue} days`;
+                    const collClass = (d.short || '').toLowerCase() === 'glanza' ? 'glanza' :
+                        (d.short || '').toLowerCase() === 'resort' ? 'resort' : 'other';
+                    const collCell = d.short ? `<span class="collection-badge ${collClass}">${d.short}</span>` : '—';
+
+                    // Default cells — where the lot sits right now
+                    let stageCell = `${cur ? cur.name : '—'}${cur && cur.vendor ? ' · ' + cur.vendor : ''}`;
+                    let dateCell = cur && cur.recv ? fmtDate(cur.recv) : '—';
+                    let daysCell = daysHere || '—';
+
+                    // With a stage filter, matched rows show THAT stage's story instead,
+                    // so a finished lot reads "Washing · Anoop ✓ Done → Packing"
+                    if (tableFilters.stage && match) {
+                        const fs = d.stages[tableFilters.stage - 1];
+                        const fName = STAGES[tableFilters.stage - 1].name;
+                        const st = stageStatus(d, tableFilters.stage);
+                        if (st === 'done') {
+                            const nowAt = delivered ? 'Delivered' : (cur && cur.n !== fs.n ? cur.name : 'next stage');
+                            stageCell = `${fName}${fs.vendor ? ' · ' + fs.vendor : ''} <span class="chip ok">✓ Done → ${nowAt}</span>`;
+                            dateCell = fs.recv ? fmtDate(fs.recv) : '—';
+                            daysCell = (fs.recv && fs.disp) ? `Done in ${daysBetween(fs.recv, fs.disp)} days` : '—';
+                        } else if (st === 'pending') {
+                            stageCell = `${fName} <span class="chip neutral">${cur ? 'Not yet — lot at ' + cur.name : 'Not started'}</span>`;
+                            dateCell = '—'; daysCell = '—';
+                        } else if (st === 'skipped') {
+                            stageCell = `${fName} <span class="chip neutral">Skipped</span>`;
+                            dateCell = '—'; daysCell = '—';
+                        }
+                        // 'current' keeps the defaults — the lot is sitting at this stage now
+                    }
+
+                    // Pieces actually at the shown stage — red −N when pcs were lost on the way
+                    const effPieces = lotEffectivePieces(d);
+                    const lost = (d.pieces && effPieces < d.pieces) ? d.pieces - effPieces : 0;
+                    const piecesCell = effPieces.toLocaleString('en-IN') +
+                        (lost ? ` <span style="color:var(--coral);font-size:10px;font-weight:700;" title="Started with ${d.pieces.toLocaleString('en-IN')} pcs — ${lost} pcs less now">−${lost}</span>` : '');
+
+                    return `<tr style="cursor:pointer;" onclick="selectAndScrollToLot('${d.lotNo}')" data-lot="${d.lotNo}">
       <td><strong>Lot ${d.lotNo}</strong></td>
       <td>${collCell}</td>
       <td>${d.item || '—'}</td>
       <td>${d.size || '—'}</td>
-      <td>${d.pieces.toLocaleString('en-IN')}</td>
-      <td>${cur ? cur.name : '—'}${cur && cur.vendor ? ' · ' + cur.vendor : ''}</td>
-      <td>${daysHere || '—'}</td>
+      <td>${piecesCell}</td>
+      <td>${stageCell}</td>
+      <td>${dateCell}</td>
+      <td>${daysCell}</td>
       <td><span class="chip ${chip}">${overdueLabel}</span></td>
     </tr>`;
-            }).join('');
+                }).join('');
 
-            // Footer: "show all" when capped, or "show first N" when expanded
-            if (capped) {
-                body.innerHTML += `<tr class="table-note-row"><td colspan="8" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">
-                    Showing first ${TABLE_ROW_LIMIT} of ${totalMatches} lots — search finds any lot, or
-                    <a href="javascript:void(0)" onclick="toggleTableShowAll(true)" style="color:var(--rose);font-weight:600;">show all ${totalMatches}</a>
-                </td></tr>`;
-            } else if (tableShowAll && !query && totalMatches > TABLE_ROW_LIMIT) {
-                body.innerHTML += `<tr class="table-note-row"><td colspan="8" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">
-                    Showing all ${totalMatches} lots —
-                    <a href="javascript:void(0)" onclick="toggleTableShowAll(false)" style="color:var(--rose);font-weight:600;">show first ${TABLE_ROW_LIMIT} only</a>
-                </td></tr>`;
+                // Footer: "show all" when capped, or "show first N" when expanded
+                if (capped) {
+                    body.innerHTML += `<tr class="table-note-row"><td colspan="9" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">
+                        Showing first ${TABLE_ROW_LIMIT} of ${totalMatches} lots — search finds any lot, or
+                        <a href="javascript:void(0)" onclick="toggleTableShowAll(true)" style="color:var(--rose);font-weight:600;">show all ${totalMatches}</a>
+                    </td></tr>`;
+                } else if (tableShowAll && !query && !hasFilter && totalMatches > TABLE_ROW_LIMIT) {
+                    body.innerHTML += `<tr class="table-note-row"><td colspan="9" style="text-align:center;padding:14px;color:var(--muted);font-size:12px;">
+                        Showing all ${totalMatches} lots —
+                        <a href="javascript:void(0)" onclick="toggleTableShowAll(false)" style="color:var(--rose);font-weight:600;">show first ${TABLE_ROW_LIMIT} only</a>
+                    </td></tr>`;
+                }
             }
+
+            renderFilterPills(matchCount, matchPieces);
+            renderPersonBar();
         }
 
         function toggleTableShowAll(on) {
