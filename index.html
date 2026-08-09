@@ -808,7 +808,7 @@
 
         .lot-summary {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 12px;
             margin-bottom: 24px;
         }
@@ -840,6 +840,14 @@
 
         .lot-info .val.ok {
             color: var(--green);
+        }
+
+        /* Second line under a value — used by Fabric Used for the per-piece figure */
+        .lot-info .sub {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--muted);
+            margin-top: 3px;
         }
 
         .collection-badge {
@@ -1170,7 +1178,8 @@
             position: relative;
         }
 
-        #articleInput {
+        #articleInput,
+        #clothInput {
             font-family: inherit;
             padding: 8px 14px 8px 34px;
             border-radius: 10px;
@@ -1182,10 +1191,16 @@
             min-width: 220px;
         }
 
-        #articleInput:focus {
+        #articleInput:focus,
+        #clothInput:focus {
             outline: none;
             border-color: var(--rose);
             box-shadow: 0 0 0 3px var(--rose-tint);
+        }
+
+        #clothInput:focus {
+            border-color: var(--teal);
+            box-shadow: 0 0 0 3px var(--teal-tint);
         }
 
         #overdueSearch {
@@ -1213,6 +1228,189 @@
             transform: translateY(-50%);
             color: var(--muted);
             pointer-events: none;
+        }
+
+        /* ---------- FABRIC CHIP BAR (the "Short" column) ---------- */
+        .cloth-bar {
+            display: none;
+            margin-bottom: 18px;
+        }
+
+        .cloth-bar.show {
+            display: block;
+            animation: fadeUp .3s ease both;
+        }
+
+        .cloth-bar-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 0 2px 9px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .cloth-bar-head b {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .cloth-head-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex: none;
+        }
+
+        /* single ↔ multi select switch */
+        .cloth-mode {
+            display: inline-flex;
+            background: #fdf2f7;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 2px;
+        }
+
+        .cloth-mode button {
+            background: transparent;
+            border: none;
+            border-radius: 999px;
+            padding: 3px 11px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all .18s;
+        }
+
+        .cloth-mode button.on {
+            background: white;
+            color: var(--teal);
+            box-shadow: 0 1px 3px rgba(120, 30, 80, .12);
+        }
+
+        .cloth-more {
+            display: block;
+            width: 100%;
+            margin-top: 9px;
+            background: transparent;
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            padding: 7px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all .18s;
+        }
+
+        .cloth-more:hover {
+            border-color: var(--teal);
+            color: var(--teal);
+            background: var(--teal-tint);
+        }
+
+        .cloth-clear {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 4px 11px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--coral);
+            cursor: pointer;
+            transition: all .18s;
+            white-space: nowrap;
+        }
+
+        .cloth-clear:hover {
+            border-color: var(--coral);
+            background: var(--coral-tint);
+        }
+
+        .cloth-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 210px;
+            overflow-y: auto;
+            padding: 1px;
+        }
+
+        /* default state with a long list — about two rows, opened by "Show all" */
+        .cloth-chips.collapsed {
+            max-height: 88px;
+            overflow: hidden;
+        }
+
+        .cloth-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 7px 13px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+            transition: all .18s;
+        }
+
+        .cloth-chip:hover {
+            border-color: var(--teal);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .cloth-chip.active {
+            background: var(--teal);
+            border-color: var(--teal);
+            color: white;
+            box-shadow: 0 2px 10px rgba(8, 145, 178, .28);
+        }
+
+        /* colour swatch — a stable per-fabric dot so a name is findable by eye */
+        .cloth-chip .cc-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            flex: none;
+        }
+
+        .cloth-chip.active .cc-dot {
+            background: white !important;
+        }
+
+        .cloth-chip .cc-count {
+            font-size: 11px;
+            font-weight: 700;
+            background: #fdf2f7;
+            color: var(--muted);
+            border-radius: 999px;
+            padding: 1px 7px;
+        }
+
+        .cloth-chip.active .cc-count {
+            background: rgba(255, 255, 255, .25);
+            color: white;
+        }
+
+        .cloth-empty {
+            padding: 16px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+            background: #fff8fb;
+            border: 1px solid var(--border);
+            border-radius: 12px;
         }
 
         /* article matches list */
@@ -1377,6 +1575,13 @@
         .article-summary .as-stats span b {
             font-weight: 700;
             color: var(--text);
+        }
+
+        /* subtitle asides ("· 2 sizes") sit quieter than the figures beside them */
+        .article-summary .as-stats em {
+            font-style: normal;
+            font-weight: 500;
+            color: var(--muted);
         }
 
         /* ---------- CHART ROWS ---------- */
@@ -1826,8 +2031,13 @@
                 width: 100%;
             }
 
+            /* three tabs share one row on a phone — tighter text, but taller for thumbs */
             .search-toggle button {
                 flex: 1;
+                justify-content: center;
+                padding: 10px 6px;
+                font-size: 11px;
+                min-height: 40px;
             }
 
             .lot-select-wrap {
@@ -1837,10 +2047,59 @@
 
             #lotSelect,
             #articleInput,
+            #clothInput,
             #overdueSearch,
             .search-input-wrap {
                 width: 100%;
                 min-width: 0;
+            }
+
+            .cloth-bar-head {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            /* Single/Multi and Clear go full width side by side instead of two tiny pills */
+            .cloth-head-actions {
+                display: flex;
+                width: 100%;
+                gap: 8px;
+            }
+
+            .cloth-mode {
+                flex: 1;
+            }
+
+            .cloth-mode button {
+                flex: 1;
+                min-height: 36px;
+                font-size: 12px;
+            }
+
+            .cloth-clear {
+                min-height: 36px;
+                padding: 4px 16px;
+            }
+
+            /* bigger fabric chips — 35px was an awkward thumb target */
+            .cloth-chip {
+                min-height: 42px;
+                padding: 8px 14px;
+                font-size: 13px;
+            }
+
+            .cloth-chips {
+                max-height: 220px;
+            }
+
+            /* two full rows of the taller chips, so a row is never clipped in half */
+            .cloth-chips.collapsed {
+                max-height: 100px;
+            }
+
+            .cloth-more {
+                min-height: 42px;
             }
 
             /* lot summary info grid */
@@ -2214,11 +2473,12 @@
             <!-- LOT TRACKER -->
             <div class="tracker-card fadeUp" style="animation-delay:.33s">
                 <div class="tracker-header">
-                    <h3>Lot Stage Tracker <span>— select a lot, or search by article number</span></h3>
+                    <h3>Lot Stage Tracker <span>— pick a lot, or search by article / fabric</span></h3>
                     <div class="search-controls">
                         <div class="search-toggle">
                             <button id="modeLot" class="active" type="button">By Lot No.</button>
                             <button id="modeArticle" type="button">By Article No.</button>
+                            <button id="modeCloth" type="button">By Fabric</button>
                         </div>
                         <div id="lotSelectGroup" class="lot-select-wrap">
                             <label for="lotSelect">Lot</label>
@@ -2238,8 +2498,24 @@
                                 <datalist id="articleList"></datalist>
                             </div>
                         </div>
+                        <!-- The Fabric box only narrows the chip list below; the chips are what
+                             you actually pick, so it needs no "Fabric" label repeating the tab -->
+                        <div id="clothSearchGroup" class="lot-select-wrap" style="display:none">
+                            <div class="search-input-wrap">
+                                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <input type="text" id="clothInput" aria-label="Search by fabric name"
+                                    placeholder="Search fabric — Glanza, Resort, 4716…" autocomplete="off" />
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                <div class="cloth-bar" id="clothBar"></div>
 
                 <div class="article-matches" id="articleMatches"></div>
                 <div class="article-summary" id="articleSummary"></div>
@@ -2688,8 +2964,10 @@
         spinStyle.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
         document.head.appendChild(spinStyle);
 
-        /* Kick off fetch on page load */
-        fetchData();
+        /* Kick off fetch at the very BOTTOM of this script, not here: the cache fast path
+           renders synchronously, and rendering now reaches the fabric-search state
+           (searchMode, activeCloths, …) which is declared further down. Calling fetchData()
+           from here would hit those `let`s in their temporal dead zone on every cached load. */
 
         /* ============== HELPERS ============== */
         function parseDate(s) {
@@ -2712,6 +2990,13 @@
         function fmtDate(d) { if (!d) return '—'; return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }); }
         function num(v) { const n = parseFloat(String(v || '').replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
         function txt(v) { const t = String(v || '').trim(); return (!t || t.startsWith('---')) ? '' : t; }
+        /* Sheet text is hand-typed and goes straight into innerHTML / onclick attributes —
+           a stray quote or angle bracket in a fabric or vendor name would break the markup. */
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         /* Consistent badge color per clothes-type value (the "Short" column) — hashes the
            string to one of 7 on-brand tints so any style/type code looks intentional rather
@@ -2838,8 +3123,10 @@
             document.getElementById('recordCount').textContent = data.length;
             renderKPIs();
             renderLotSelect();
-            setupSearchMode();
             if (data.length) renderLotDetail(data[0].lotNo);
+            // After the default lot detail — re-applies the active search mode on top,
+            // so a 5-minute sync doesn't kick the user back to "By Lot No."
+            setupSearchMode();
             renderFunnel();
             renderAvgDays();
             renderVendor();
@@ -2885,68 +3172,267 @@
             dl.innerHTML = uniqueArticles.map(a => `<option value="${a}">`).join('');
         }
 
-        function setupSearchMode() {
-            const modeLot = document.getElementById('modeLot');
-            const modeArt = document.getElementById('modeArticle');
-            const lotGroup = document.getElementById('lotSelectGroup');
-            const artGroup = document.getElementById('articleSearchGroup');
-            const artInput = document.getElementById('articleInput');
-            const matches = document.getElementById('articleMatches');
-            const summary = document.getElementById('articleSummary');
+        /* ---------- SEARCH MODES: Lot No. / Article / Fabric ---------- */
+        const SEARCH_MODES = {
+            lot: { btn: 'modeLot', group: 'lotSelectGroup' },
+            article: { btn: 'modeArticle', group: 'articleSearchGroup' },
+            cloth: { btn: 'modeCloth', group: 'clothSearchGroup' }
+        };
+        let searchMode = 'lot';
 
-            modeLot.onclick = () => {
-                modeLot.classList.add('active'); modeArt.classList.remove('active');
-                lotGroup.style.display = ''; artGroup.style.display = 'none';
-                matches.classList.remove('show'); summary.classList.remove('show');
-                if (FILTERED.length) renderLotDetail(document.getElementById('lotSelect').value);
+        function hideMatchPanel() {
+            document.getElementById('articleMatches').classList.remove('show');
+            document.getElementById('articleSummary').classList.remove('show');
+        }
+
+        function applySearchMode(mode) {
+            searchMode = mode;
+            for (const [k, v] of Object.entries(SEARCH_MODES)) {
+                document.getElementById(v.btn).classList.toggle('active', k === mode);
+                document.getElementById(v.group).style.display = k === mode ? '' : 'none';
+            }
+            document.getElementById('clothBar').classList.toggle('show', mode === 'cloth');
+
+            if (mode === 'lot') {
+                hideMatchPanel();
+                const sel = document.getElementById('lotSelect');
+                if (FILTERED.length && sel.value) renderLotDetail(sel.value);
+                return;
+            }
+            if (mode === 'article') {
+                const q = document.getElementById('articleInput').value.trim();
+                q ? searchByArticle(q) : hideMatchPanel();
+                return;
+            }
+            // fabric — a picked fabric can vanish entirely when the top filters change scope
+            const available = new Set(clothGroups().map(g => g.label.toLowerCase()));
+            activeCloths = activeCloths.filter(c => available.has(c.toLowerCase()));
+            renderClothChips(clothInputValue());
+            activeCloths.length ? showClothResults() : hideMatchPanel();
+        }
+
+        function setupSearchMode() {
+            // Assignment, not addEventListener — renderAll() runs this again on every
+            // 5-minute sync, and addEventListener would stack a duplicate each time.
+            document.getElementById('modeLot').onclick = () => applySearchMode('lot');
+            document.getElementById('modeArticle').onclick = () => {
+                applySearchMode('article');
+                document.getElementById('articleInput').focus();
             };
-            modeArt.onclick = () => {
-                modeArt.classList.add('active'); modeLot.classList.remove('active');
-                lotGroup.style.display = 'none'; artGroup.style.display = '';
-                artInput.focus();
-                if (artInput.value.trim()) searchByArticle(artInput.value.trim());
-                else { matches.classList.remove('show'); summary.classList.remove('show'); }
+            document.getElementById('modeCloth').onclick = () => {
+                applySearchMode('cloth');
+                document.getElementById('clothInput').focus();
             };
-            artInput.oninput = e => searchByArticle(e.target.value.trim());
+            document.getElementById('articleInput').oninput = e => searchByArticle(e.target.value.trim());
+            document.getElementById('clothInput').oninput = e => renderClothChips(e.target.value.trim());
+
+            applySearchMode(searchMode); // survive a re-render without losing the active mode
+        }
+
+        /* ---------- FABRIC (the "Short" column) ---------- */
+        // Short is free text typed by hand — some rows carry a code (4716) where others
+        // carry a name (Glanza, Resort, Martin), and the same fabric can be written two
+        // ways ("Glanza" vs "Glanza(28/07/2026)"). Chips built from the data itself
+        // sidestep that: you pick what exists instead of guessing the spelling.
+        // Grouping is case-insensitive, label = first spelling seen.
+        function clothGroups() {
+            const map = new Map();
+            for (const d of visibleData()) {
+                if (!d.short) continue;
+                const k = d.short.toLowerCase();
+                if (!map.has(k)) map.set(k, { label: d.short, lots: [] });
+                map.get(k).lots.push(d);
+            }
+            return [...map.values()]
+                .sort((a, b) => b.lots.length - a.lots.length || a.label.localeCompare(b.label));
+        }
+
+        // Stable colour per fabric name so the same swatch always means the same fabric
+        const CLOTH_DOT_VARS = ['--rose', '--magenta', '--plum', '--teal', '--amber', '--green', '--coral'];
+        function clothDot(label) {
+            let h = 0;
+            for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0;
+            return `var(${CLOTH_DOT_VARS[h % CLOTH_DOT_VARS.length]})`;
+        }
+
+        let activeCloths = [];            // selected labels, in the order they were picked
+        let clothSelectMode = 'single';   // 'single' — one at a time | 'multi' — combine several
+        let clothExpanded = false;        // list is collapsed to ~2 rows until asked to open
+        const CLOTH_COLLAPSE_AT = 8;      // more chips than this and the list gets an expander
+
+        function clothInputValue() {
+            const el = document.getElementById('clothInput');
+            return el ? el.value.trim() : '';
+        }
+
+        function isClothActive(label) {
+            const k = label.toLowerCase();
+            return activeCloths.some(c => c.toLowerCase() === k);
+        }
+
+        function renderClothChips(filter = '') {
+            const bar = document.getElementById('clothBar');
+            if (!bar) return;
+            const q = filter.toLowerCase();
+            const all = clothGroups();
+            const groups = (q ? all.filter(g => g.label.toLowerCase().includes(q)) : all)
+                // selected chips ride to the front — otherwise the collapsed two rows can
+                // hide what you already picked
+                .sort((a, b) => (isClothActive(b.label) ? 1 : 0) - (isClothActive(a.label) ? 1 : 0));
+            // typing a filter is itself a request to see what matched, so open the list
+            const collapsed = !clothExpanded && !q && groups.length > CLOTH_COLLAPSE_AT;
+
+            if (!groups.length) {
+                bar.innerHTML = `<div class="cloth-empty">No fabric matches "<b>${esc(filter)}</b>" —
+                    ${all.length} fabric${all.length === 1 ? '' : 's'} in this view</div>`;
+                return;
+            }
+
+            const shownLots = groups.reduce((s, g) => s + g.lots.length, 0);
+            const picked = activeCloths.length;
+            bar.innerHTML = `
+    <div class="cloth-bar-head">
+      <span>${picked
+                    ? `<b>${picked}</b> selected — showing <b>${clothLots().length}</b> lot${clothLots().length === 1 ? '' : 's'}`
+                    : `<b>${groups.length}</b> fabric${groups.length === 1 ? '' : 's'} ·
+                       <b>${shownLots.toLocaleString('en-IN')}</b> lots — tap one to see only those lots`}</span>
+      <span class="cloth-head-actions">
+        <span class="cloth-mode" id="clothMode">
+          <button type="button" data-sel="single" class="${clothSelectMode === 'single' ? 'on' : ''}">Single</button>
+          <button type="button" data-sel="multi" class="${clothSelectMode === 'multi' ? 'on' : ''}">Multi</button>
+        </span>
+        ${picked ? `<button type="button" class="cloth-clear" id="clothClear">Clear ✕</button>` : ''}
+      </span>
+    </div>
+    <div class="cloth-chips${collapsed ? ' collapsed' : ''}">
+      ${groups.map(g => `<button type="button" class="cloth-chip${isClothActive(g.label) ? ' active' : ''}" data-cloth="${esc(g.label)}">
+          <span class="cc-dot" style="background:${clothDot(g.label)}"></span>
+          <span>${esc(g.label)}</span>
+          <span class="cc-count">${g.lots.length}</span>
+      </button>`).join('')}
+    </div>
+    ${(!q && groups.length > CLOTH_COLLAPSE_AT)
+                    ? `<button type="button" class="cloth-more" id="clothMore">${collapsed ? `Show all ${groups.length} fabrics ▾` : 'Show less ▴'}</button>`
+                    : ''}`;
+
+            bar.querySelectorAll('.cloth-chip').forEach(chip => {
+                chip.onclick = () => toggleCloth(chip.dataset.cloth);
+            });
+            bar.querySelectorAll('#clothMode button').forEach(btn => {
+                btn.onclick = () => setClothSelectMode(btn.dataset.sel);
+            });
+            const more = document.getElementById('clothMore');
+            if (more) more.onclick = () => { clothExpanded = !clothExpanded; renderClothChips(clothInputValue()); };
+            const clear = document.getElementById('clothClear');
+            if (clear) clear.onclick = () => {
+                activeCloths = [];
+                renderClothChips(clothInputValue());
+                hideMatchPanel();
+            };
+        }
+
+        // Switching back to Single keeps the first pick rather than silently clearing everything
+        function setClothSelectMode(mode) {
+            if (mode === clothSelectMode) return;
+            clothSelectMode = mode;
+            if (mode === 'single' && activeCloths.length > 1) activeCloths = [activeCloths[0]];
+            renderClothChips(clothInputValue());
+            activeCloths.length ? showClothResults() : hideMatchPanel();
+        }
+
+        function toggleCloth(label) {
+            const k = label.toLowerCase();
+            const i = activeCloths.findIndex(c => c.toLowerCase() === k);
+            if (clothSelectMode === 'single') {
+                activeCloths = i >= 0 ? [] : [label];   // tapping the active chip clears it
+            } else if (i >= 0) {
+                activeCloths.splice(i, 1);
+            } else {
+                activeCloths.push(label);
+            }
+            searchMode = 'cloth';
+            renderClothChips(clothInputValue());
+            activeCloths.length ? showClothResults() : hideMatchPanel();
+        }
+
+        function clothLots() {
+            if (!activeCloths.length) return [];
+            const keys = new Set(activeCloths.map(c => c.toLowerCase()));
+            return visibleData().filter(d => d.short && keys.has(d.short.toLowerCase()))
+                .sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
+        }
+
+        function showClothResults() {
+            const hits = clothLots();
+            const multi = activeCloths.length > 1;
+            const items = [...new Set(hits.map(d => d.item).filter(Boolean))];
+            const sizes = [...new Set(hits.map(d => d.size).filter(Boolean))];
+
+            renderMatchPanel(hits, {
+                title: multi ? `Fabric · ${activeCloths.length} selected` : `Fabric · ${activeCloths[0]}`,
+                query: activeCloths.join(', '),
+                subtitle: multi
+                    ? `${activeCloths.map(esc).join(' + ')} <em>· ${items.length} item${items.length === 1 ? '' : 's'} ·
+                       ${sizes.length} size${sizes.length === 1 ? '' : 's'}</em>`
+                    : (items.length === 1
+                        ? `${esc(items[0])} <em>· ${sizes.length} size${sizes.length === 1 ? '' : 's'}</em>`
+                        : `<em>Used across</em> ${items.length} item${items.length === 1 ? '' : 's'} <em>·
+                           ${sizes.length} size${sizes.length === 1 ? '' : 's'}</em>`),
+                // with several fabrics mixed together the fabric name is what tells lots apart
+                chipDetail: d => multi ? d.short : (d.item || d.itemNo)
+            });
         }
 
         function searchByArticle(query) {
-            const matches = document.getElementById('articleMatches');
-            const summary = document.getElementById('articleSummary');
-            if (!query) {
-                matches.classList.remove('show');
-                summary.classList.remove('show');
-                return;
-            }
+            if (!query) { hideMatchPanel(); return; }
+            // case-insensitive, partial match on Item No.
             const q = query.toLowerCase();
             const hits = visibleData().filter(d => d.itemNo.toLowerCase().includes(q))
                 .sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
 
+            const exact = hits.length && hits.every(d => d.itemNo === hits[0].itemNo) ? hits[0].itemNo : null;
+            const clothTypes = [...new Set(hits.map(d => d.short).filter(Boolean))];
+            renderMatchPanel(hits, {
+                title: `Article ${exact || query}`,
+                query,
+                subtitle: exact
+                    ? `${esc(hits[0].item)} ${clothTypes.length ? `<em>· fabric: ${esc(clothTypes.join(', '))}</em>` : ''}`
+                    : `<em>${hits.length} lots matching</em> "${esc(query)}"`,
+                chipDetail: d => d.short
+            });
+        }
+
+        // Shared results panel for Article and Fabric search: aggregate stats on top,
+        // clickable lot chips below. `chipDetail` picks the third field on each chip —
+        // whichever of item/fabric is NOT already implied by the search itself.
+        function renderMatchPanel(hits, { title, query, subtitle, chipDetail }) {
+            const matches = document.getElementById('articleMatches');
+            const summary = document.getElementById('articleSummary');
+
             if (!hits.length) {
-                matches.innerHTML = `<div class="am-empty">No lots found for article "<b>${query}</b>"${ACTIVE_COLLECTION !== 'All' ? ` in <b>${ACTIVE_COLLECTION}</b>` : ''}</div>`;
+                matches.innerHTML = `<div class="am-empty">No lots found for "<b>${esc(query)}</b>"${ACTIVE_COLLECTION !== 'All' ? ` in <b>${esc(ACTIVE_COLLECTION)}</b>` : ''}</div>`;
                 matches.classList.add('show');
                 summary.classList.remove('show');
                 return;
             }
 
             const totalPieces = hits.reduce((s, d) => s + d.pieces, 0);
-            const stagesCount = { done: 0, current: 0, pending: 0 };
-            hits.forEach(d => {
-                if (d.currentStage === 0 && d.completedThrough === FINAL_STAGE) stagesCount.done++;
-                else if (d.currentStage > 0) stagesCount.current++;
-                else stagesCount.pending++;
-            });
-            const overdueCount = hits.filter(d => d.overdue > 30).length;
-            const exactArticle = hits.every(d => d.itemNo === hits[0].itemNo) ? hits[0].itemNo : null;
-            const itemName = exactArticle ? hits[0].item : `${hits.length} lots matching "${query}"`;
+            const totalMeter = hits.reduce((s, d) => s + d.meter, 0);
+            const delivered = hits.filter(d => isLotDelivered(d)).length;
+            const inProgress = hits.filter(d => !isLotDelivered(d) && d.currentStage > 0).length;
+            const notStarted = hits.length - delivered - inProgress;
+            const overdueCount = hits.filter(d => !isLotDelivered(d) && d.overdue > 30).length;
 
             summary.innerHTML = `
-    <div class="as-title">Article ${exactArticle || query} — Summary</div>
+    <div class="as-title">${esc(title)} — Summary</div>
     <div class="as-stats">
-      <span><b>${itemName}</b></span>
+      <span>${subtitle}</span>
       <span><b>${hits.length}</b> lots</span>
       <span><b>${totalPieces.toLocaleString('en-IN')}</b> total pieces</span>
-      <span><b>${stagesCount.current}</b> in progress · <b>${stagesCount.done}</b> completed</span>
+      <span><b>${Math.round(totalMeter).toLocaleString('en-IN')}</b> mtr fabric used</span>
+      ${/* Weighted: total metres over total pieces, not a mean of per-lot averages */''}
+      <span><b>${totalPieces ? (totalMeter / totalPieces).toFixed(2) : '—'}</b> mtr/pc avg</span>
+      <span><b>${inProgress}</b> in progress · <b>${delivered}</b> delivered${notStarted ? ` · <b>${notStarted}</b> not started` : ''}</span>
       ${overdueCount ? `<span style="color:var(--coral)"><b>${overdueCount}</b> overdue</span>` : ''}
     </div>`;
             summary.classList.add('show');
@@ -2958,12 +3444,13 @@
     </div>
     <div class="am-list">
       ${hits.map(d => {
-                const isDelivered = d.currentStage === 0 && d.completedThrough === FINAL_STAGE;
-                const stageN = isDelivered ? 0 : d.currentStage;
-                const stageName = isDelivered ? 'Delivered' : (stageNameMap[d.currentStage] || 'Pending');
-                return `<div class="am-chip" data-lot="${d.lotNo}">
-          <div class="am-lot">Lot ${d.lotNo} · ${d.size}</div>
-          <div class="am-meta"><span>${d.pieces} pcs</span><span>${d.overdue}d overdue</span></div>
+                const done = isLotDelivered(d);
+                const stageN = done ? 0 : d.currentStage;
+                const stageName = done ? 'Delivered' : (stageNameMap[d.currentStage] || 'Pending');
+                const detail = chipDetail(d);
+                return `<div class="am-chip" data-lot="${esc(d.lotNo)}">
+          <div class="am-lot">Lot ${esc(d.lotNo)} · ${esc(d.size)}${detail ? ' · ' + esc(detail) : ''}</div>
+          <div class="am-meta"><span>${d.pieces} pcs</span><span>${done ? 'delivered' : d.overdue + 'd overdue'}</span></div>
           <span class="am-stage s${stageN}">${stageName}</span>
         </div>`;
             }).join('')}
@@ -2978,6 +3465,7 @@
                 };
             });
 
+            // auto-select first match
             matches.querySelector('.am-chip').classList.add('active');
             renderLotDetail(hits[0].lotNo);
         }
@@ -2989,11 +3477,15 @@
             const today = new Date();
             const totalDays = d.date ? daysBetween(d.date, today) : null;
             const typeClass = typeBadgeClass(d.short);
+            // Fabric used — total metres issued, and how much of it went into each piece.
+            // Straight from the sheet's Average column (Meter ÷ Pieces), no comparison.
+            const clothSub = d.avg ? `${d.avg.toFixed(2)} mtr/pc` : '—';
             const summary = document.getElementById('lotSummary');
             summary.innerHTML = `
-    <div class="lot-info"><div class="lbl">Item</div><div class="val">${d.item || '—'}</div></div>
-    <div class="lot-info"><div class="lbl">Clothes Type</div><div class="val">${d.short ? `<span class="collection-badge ${typeClass}">${d.short}</span>` : '—'}</div></div>
-    <div class="lot-info"><div class="lbl">Size · Pieces</div><div class="val">${d.size || '—'} · ${d.pieces}</div></div>
+    <div class="lot-info"><div class="lbl">Item</div><div class="val">${esc(d.item) || '—'}</div></div>
+    <div class="lot-info"><div class="lbl">Fabric</div><div class="val">${d.short ? `<span class="collection-badge ${typeClass}">${esc(d.short)}</span>` : '—'}</div></div>
+    <div class="lot-info"><div class="lbl">Size · Pieces</div><div class="val">${esc(d.size) || '—'} · ${d.pieces}</div></div>
+    <div class="lot-info" title="Fabric issued for this lot"><div class="lbl">Fabric Used</div><div class="val">${d.meter ? d.meter.toLocaleString('en-IN') + ' mtr' : '—'}</div><div class="sub">${clothSub}</div></div>
     <div class="lot-info"><div class="lbl">Started</div><div class="val">${fmtDate(d.date)} <span style="font-weight:500;color:var(--muted);font-size:12px">(${totalDays !== null ? totalDays + 'd ago' : '—'})</span></div></div>
     <div class="lot-info"><div class="lbl">Overdue Days</div><div class="val ${d.overdue > 30 ? 'warn' : d.overdue > 15 ? '' : 'ok'}">${d.overdue}</div></div>
   `;
@@ -3804,6 +4296,9 @@
                 });
             }
         })();
+
+        /* Kick off the data fetch — last, so every declaration above is initialized first */
+        fetchData();
     </script>
 </body>
 
