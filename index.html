@@ -494,6 +494,72 @@
             color: white;
         }
 
+        /* ---------- LAST-SYNC INDICATOR (next to Refresh Data) ---------- */
+        .refresh-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sync-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 13px;
+            border-radius: 999px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            white-space: nowrap;
+            cursor: default;
+        }
+
+        .sync-status .ss-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            flex: none;
+        }
+
+        .sync-status b {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        /* Data older than the 5-minute TTL — still usable, but say so */
+        .sync-status.stale {
+            background: var(--amber-tint);
+            border-color: transparent;
+            color: var(--amber);
+        }
+
+        .sync-status.stale .ss-dot { background: var(--amber); }
+        .sync-status.stale b { color: var(--amber); }
+
+        /* Last sync attempt failed, or the data is very old */
+        .sync-status.failed {
+            background: var(--coral-tint);
+            border-color: transparent;
+            color: var(--coral);
+        }
+
+        .sync-status.failed .ss-dot {
+            background: var(--coral);
+            animation: pulse 1.6s infinite;
+        }
+
+        .sync-status.failed b { color: var(--coral); }
+
+        /* Mid-sync */
+        .sync-status.syncing .ss-dot {
+            background: var(--rose);
+            animation: pulse 1.2s infinite;
+        }
+
         .reset-btn {
             background: white;
             border: 1px solid var(--border);
@@ -1958,8 +2024,21 @@
                 flex: 1;
             }
 
+            /* Sync badge + Refresh share one full-width row; the badge keeps its
+               natural width so "Updated 6 min ago" never wraps mid-phrase */
+            .refresh-group {
+                display: flex;
+                width: 100%;
+                gap: 8px;
+            }
+
+            .refresh-group .sync-status {
+                flex: none;
+            }
+
             .reset-btn {
                 width: 100%;
+                flex: 1;
             }
 
             .lot-slider {
@@ -2425,7 +2504,10 @@
                     <button type="button" class="lot-slider-opt" data-mode="all" onclick="setLotStatusFilter('all')">All Lots</button>
                     <button type="button" class="lot-slider-opt active" data-mode="pending" onclick="setLotStatusFilter('pending')">Pending Lot</button>
                 </div>
-                <button class="reset-btn" id="resetBtn">↻ Refresh Data</button>
+                <div class="refresh-group">
+                    <span class="sync-status" id="syncStatus" title="Last successful pull from the production sheet"></span>
+                    <button class="reset-btn" id="resetBtn">↻ Refresh Data</button>
+                </div>
             </div>
 
             <!-- KPIs -->
@@ -2692,6 +2774,18 @@
         const CACHE_KEY = 'lotDash_MaleLine_cache';
         const CACHE_TTL = 5 * 60 * 1000; // 5 minutes — data older than this triggers background refresh
 
+        /* ---------- BAKED-IN SNAPSHOT (seed) ---------- */
+        /* First-ever visit has no localStorage cache, and this API takes 30-50s to
+           answer — so the page would sit on a skeleton for the better part of a minute.
+           This snapshot renders instantly instead, then the live sync replaces it.
+           FALLBACK_STAMP is when it was taken, so the "Updated ..." badge reports the
+           snapshot's real age rather than pretending it just synced. Re-bake it
+           whenever you want the cold-start view to be closer to current. */
+        /* Snapshot baked in 2026-09-01T05:03:57.932Z */
+        const FALLBACK_STAMP = 1788239037932;
+        const FALLBACK_DATA = [{"UNIQUE ID":"1001 28x34","Date":"2026-04-01T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1001,"Meter":426,"Short":"Glanza","Size":"28x34","Pieces":498,"Item":"FF 1 Button","Average":0.8554216867469879,"Pieces 2":498,"Received Date 2":"2026-04-02T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-04-02T18:30:00.000Z","Pieces 3":498,"Received Date 3":"2026-04-02T18:30:00.000Z","Fabricator 3":"Haseeb","Dispatched Date 3":"2026-04-28T18:30:00.000Z","Pieces 4":498,"Received Date 4":"2026-04-28T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-13T18:30:00.000Z","Pieces 5":498,"Received Date 5":"2026-05-13T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-06-03T18:30:00.000Z","Pieces 6":492,"Received Date 6":"2026-06-03T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-08T18:30:00.000Z","Pieces 7":493,"Received Date 7":"2026-06-08T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1002 28x34","Date":"2026-04-01T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1002,"Meter":445,"Short":"Glanza","Size":"28x34","Pieces":522,"Item":"FF 1 Button","Average":0.8524904214559387,"Pieces 2":522,"Received Date 2":"2026-04-02T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-04-02T18:30:00.000Z","Pieces 3":522,"Received Date 3":"2026-04-02T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-04-19T18:30:00.000Z","Pieces 4":522,"Received Date 4":"2026-04-19T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-04-21T18:30:00.000Z","Pieces 5":522,"Received Date 5":"2026-04-21T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-05-06T18:30:00.000Z","Pieces 6":515,"Received Date 6":"2026-05-06T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-05-23T18:30:00.000Z","Pieces 7":515,"Received Date 7":"2026-05-23T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1003 32x36","Date":"2026-04-02T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1003,"Meter":446,"Short":"Glanza","Size":"32x36","Pieces":492,"Item":"FF 1 Button","Average":0.9065040650406504,"Pieces 2":492,"Received Date 2":"2026-04-02T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-04-02T18:30:00.000Z","Pieces 3":492,"Received Date 3":"2026-04-02T18:30:00.000Z","Fabricator 3":"Amir","Dispatched Date 3":"2026-04-22T18:30:00.000Z","Pieces 4":492,"Received Date 4":"2026-04-22T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-04-26T18:30:00.000Z","Pieces 5":492,"Received Date 5":"2026-04-26T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-05-13T18:30:00.000Z","Pieces 6":492,"Received Date 6":"2026-05-13T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-05-16T18:30:00.000Z","Pieces 7":492,"Received Date 7":"2026-05-16T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1004 36x40","Date":"2026-04-02T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1004,"Meter":406,"Short":"Glanza","Size":"36x40","Pieces":410,"Item":"FF 1 Button","Average":0.9902439024390244,"Pieces 2":410,"Received Date 2":"2026-04-03T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-04-03T18:30:00.000Z","Pieces 3":410,"Received Date 3":"2026-04-03T18:30:00.000Z","Fabricator 3":"Amir","Dispatched Date 3":"2026-04-26T18:30:00.000Z","Pieces 4":410,"Received Date 4":"2026-04-26T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-13T18:30:00.000Z","Pieces 5":410,"Received Date 5":"2026-05-13T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-06-03T18:30:00.000Z","Pieces 6":410,"Received Date 6":"2026-06-03T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-17T18:30:00.000Z","Pieces 7":409,"Received Date 7":"2026-06-17T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1005 28x34","Date":"2026-04-08T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1005,"Meter":398,"Short":"Glanza","Size":"28x34","Pieces":462,"Item":"FF 1 Button","Average":0.8614718614718615,"Pieces 2":462,"Received Date 2":"2026-04-08T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-04-08T18:30:00.000Z","Pieces 3":462,"Received Date 3":"2026-04-08T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-04-22T18:30:00.000Z","Pieces 4":462,"Received Date 4":"2026-04-22T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-04-26T18:30:00.000Z","Pieces 5":462,"Received Date 5":"2026-04-26T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-05-13T18:30:00.000Z","Pieces 6":462,"Received Date 6":"2026-05-13T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-05-16T18:30:00.000Z","Pieces 7":462,"Received Date 7":"2026-05-16T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1006 36x40","Date":"2026-04-10T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1006,"Meter":320,"Short":"Glanza","Size":"36x40","Pieces":320,"Item":"FF 1 Button","Average":1,"Pieces 2":320,"Received Date 2":"2026-04-10T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-04-14T18:30:00.000Z","Pieces 3":320,"Received Date 3":"2026-04-14T18:30:00.000Z","Fabricator 3":"Haseeb","Dispatched Date 3":"2026-05-02T18:30:00.000Z","Pieces 4":320,"Received Date 4":"2026-05-02T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-05T18:30:00.000Z","Pieces 5":320,"Received Date 5":"2026-05-05T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-05-31T18:30:00.000Z","Pieces 6":320,"Received Date 6":"2026-05-31T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-05T18:30:00.000Z","Pieces 7":320,"Received Date 7":"2026-06-05T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1007 28x34","Date":"2026-04-10T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1007,"Meter":340,"Short":"Glanza","Size":"28x34","Pieces":402,"Item":"FF 1 Button","Average":0.845771144278607,"Pieces 2":402,"Received Date 2":"2026-04-12T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-04-12T18:30:00.000Z","Pieces 3":402,"Received Date 3":"2026-04-12T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-04-29T18:30:00.000Z","Pieces 4":402,"Received Date 4":"2026-04-29T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-12T18:30:00.000Z","Pieces 5":402,"Received Date 5":"2026-05-12T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-06-08T18:30:00.000Z","Pieces 6":402,"Received Date 6":"2026-06-08T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-24T18:30:00.000Z","Pieces 7":404,"Received Date 7":"2026-06-24T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1008 32x36","Date":"2026-04-10T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1008,"Meter":321,"Short":"Glanza","Size":"32x36","Pieces":354,"Item":"FF 1 Button","Average":0.9067796610169492,"Pieces 2":354,"Received Date 2":"2026-04-12T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-04-14T18:30:00.000Z","Pieces 3":354,"Received Date 3":"2026-04-14T18:30:00.000Z","Fabricator 3":"Haseeb","Dispatched Date 3":"2026-05-02T18:30:00.000Z","Pieces 4":354,"Received Date 4":"2026-05-02T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-05T18:30:00.000Z","Pieces 5":354,"Received Date 5":"2026-05-05T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-05-31T18:30:00.000Z","Pieces 6":354,"Received Date 6":"2026-05-31T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-05T18:30:00.000Z","Pieces 7":355,"Received Date 7":"2026-06-05T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1009 28x34","Date":"2026-04-15T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1009,"Meter":366,"Short":"Resort","Size":"28x34","Pieces":426,"Item":"FF 1 Button","Average":0.8591549295774648,"Pieces 2":426,"Received Date 2":"2026-04-15T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-04-16T18:30:00.000Z","Pieces 3":426,"Received Date 3":"2026-04-16T18:30:00.000Z","Fabricator 3":"Amir","Dispatched Date 3":"2026-05-13T18:30:00.000Z","Pieces 4":426,"Received Date 4":"2026-05-13T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-15T18:30:00.000Z","Pieces 5":426,"Received Date 5":"2026-05-15T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-06-15T18:30:00.000Z","Pieces 6":426,"Received Date 6":"2026-06-15T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-20T18:30:00.000Z","Pieces 7":426,"Received Date 7":"2026-06-20T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1010 28x34","Date":"2026-04-15T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1010,"Meter":365,"Short":"Resort","Size":"28x34","Pieces":432,"Item":"FF 1 Button","Average":0.8449074074074074,"Pieces 2":432,"Received Date 2":"2026-04-15T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-04-15T18:30:00.000Z","Pieces 3":432,"Received Date 3":"2026-04-15T18:30:00.000Z","Fabricator 3":"Juned","Dispatched Date 3":"2026-05-16T18:30:00.000Z","Pieces 4":432,"Received Date 4":"2026-05-16T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-18T18:30:00.000Z","Pieces 5":432,"Received Date 5":"2026-05-18T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-07-03T18:30:00.000Z","Pieces 6":432,"Received Date 6":"2026-07-03T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-07-10T18:30:00.000Z","Pieces 7":426,"Received Date 7":"11//07/2026","Shop 7":"Shop"},{"UNIQUE ID":"1011 36x40","Date":"2026-04-15T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1011,"Meter":413,"Short":"Resort","Size":"36x40","Pieces":420,"Item":"FF 1 Button","Average":0.9833333333333333,"Pieces 2":420,"Received Date 2":"2026-04-16T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-04-16T18:30:00.000Z","Pieces 3":420,"Received Date 3":"2026-04-16T18:30:00.000Z","Fabricator 3":"Amir","Dispatched Date 3":"2026-05-10T18:30:00.000Z","Pieces 4":420,"Received Date 4":"2026-05-10T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-15T18:30:00.000Z","Pieces 5":420,"Received Date 5":"2026-05-15T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-06-11T18:30:00.000Z","Pieces 6":420,"Received Date 6":"2026-06-11T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-17T18:30:00.000Z","Pieces 7":420,"Received Date 7":"2026-06-17T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1012 28x34","Date":"2026-04-16T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1012,"Meter":413,"Short":"Resort","Size":"28x34","Pieces":480,"Item":"FF 1 Button","Average":0.8604166666666667,"Pieces 2":480,"Received Date 2":"2026-04-16T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-04-17T18:30:00.000Z","Pieces 3":480,"Received Date 3":"2026-04-17T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-05-20T18:30:00.000Z","Pieces 4":480,"Received Date 4":"2026-05-20T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-27T18:30:00.000Z","Pieces 5":480,"Received Date 5":"2026-05-27T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-06-22T18:30:00.000Z","Pieces 6":480,"Received Date 6":"2026-06-22T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-27T18:30:00.000Z","Pieces 7":479,"Received Date 7":"2026-06-27T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1013 32x36","Date":"2026-04-16T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1013,"Meter":432,"Short":"Resort","Size":"32x36","Pieces":480,"Item":"FF 1 Button","Average":0.9,"Pieces 2":480,"Received Date 2":"2026-04-16T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-04-17T18:30:00.000Z","Pieces 3":480,"Received Date 3":"2026-04-17T18:30:00.000Z","Fabricator 3":"Haseeb","Dispatched Date 3":"2026-05-12T18:30:00.000Z","Pieces 4":480,"Received Date 4":"2026-05-12T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-15T18:30:00.000Z","Pieces 5":480,"Received Date 5":"2026-05-15T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-06-11T18:30:00.000Z","Pieces 6":477,"Received Date 6":"2026-06-11T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-06-17T18:30:00.000Z","Pieces 7":477,"Received Date 7":"2026-06-17T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1014 36x40","Date":"2026-05-12T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1014,"Meter":372,"Short":"Resort","Size":"36x40","Pieces":375,"Item":"FF 1 Button","Average":0.992,"Pieces 2":375,"Received Date 2":"2026-05-12T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-05-13T18:30:00.000Z","Pieces 3":375,"Received Date 3":"2026-05-13T18:30:00.000Z","Fabricator 3":"Haseeb","Dispatched Date 3":"2026-05-26T18:30:00.000Z","Pieces 4":375,"Received Date 4":"2026-05-26T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-29T18:30:00.000Z","Pieces 5":375,"Received Date 5":"2026-05-29T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-07-07T18:30:00.000Z","Pieces 6":375,"Received Date 6":"2026-07-07T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-07-17T18:30:00.000Z","Pieces 7":372,"Received Date 7":"2026-07-17T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1015 32x36","Date":"2026-05-12T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1015,"Meter":336,"Short":"Resort","Size":"32x36","Pieces":372,"Item":"FF 1 Button","Average":0.9032258064516129,"Pieces 2":372,"Received Date 2":"2026-05-12T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-05-13T18:30:00.000Z","Pieces 3":372,"Received Date 3":"2026-05-13T18:30:00.000Z","Fabricator 3":"Haseeb","Dispatched Date 3":"2026-05-26T18:30:00.000Z","Pieces 4":372,"Received Date 4":"2026-05-26T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-05-29T18:30:00.000Z","Pieces 5":372,"Received Date 5":"2026-05-29T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-07-07T18:30:00.000Z","Pieces 6":372,"Received Date 6":"2026-07-07T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-07-16T18:30:00.000Z","Pieces 7":376,"Received Date 7":"2026-07-16T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1016 28x34","Date":"2026-05-12T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1016,"Meter":438,"Short":"Resort","Size":"28x34","Pieces":516,"Item":"FF 1 Button","Average":0.8488372093023255,"Pieces 2":516,"Received Date 2":"2026-05-13T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-05-13T18:30:00.000Z","Pieces 3":516,"Received Date 3":"2026-05-13T18:30:00.000Z","Fabricator 3":"Virender","Dispatched Date 3":"2026-06-13T18:30:00.000Z","Pieces 4":516,"Received Date 4":"2026-06-13T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-14T18:30:00.000Z","Pieces 5":516,"Received Date 5":"2026-06-14T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-07-30T18:30:00.000Z","Pieces 6":515,"Received Date 6":"2026-07-30T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-08-03T18:30:00.000Z","Pieces 7":516,"Received Date 7":"2026-08-03T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1017 28x34","Date":"2026-05-12T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1017,"Meter":390,"Short":"Resort","Size":"28x34","Pieces":456,"Item":"FF 1 Button","Average":0.8552631578947368,"Pieces 2":456,"Received Date 2":"2026-05-13T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-05-14T18:30:00.000Z","Pieces 3":456,"Received Date 3":"2026-05-14T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-06-14T18:30:00.000Z","Pieces 4":456,"Received Date 4":"2026-06-14T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-15T18:30:00.000Z","Pieces 5":456,"Received Date 5":"2026-06-15T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-07-30T18:30:00.000Z","Pieces 6":455,"Received Date 6":"2026-07-30T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-08-07T18:30:00.000Z","Pieces 7":454,"Received Date 7":"2026-08-07T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1018 28x34","Date":"2026-05-13T18:30:00.000Z","Overdue Days":"Shop-Delivered","Item No.":"JDV01","Lot No.":1018,"Meter":423,"Short":"Resort","Size":"28x34","Pieces":504,"Item":"FF 1 Button","Average":0.8392857142857143,"Pieces 2":504,"Received Date 2":"2026-05-14T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-05-18T18:30:00.000Z","Pieces 3":504,"Received Date 3":"2026-05-18T18:30:00.000Z","Fabricator 3":"Pawan","Dispatched Date 3":"2026-06-05T18:30:00.000Z","Pieces 4":504,"Received Date 4":"2026-06-05T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-09T18:30:00.000Z","Pieces 5":504,"Received Date 5":"2026-06-09T18:30:00.000Z","Washing 5":"Anoop","Dispatched Date 5":"2026-07-03T18:30:00.000Z","Pieces 6":502,"Received Date 6":"2026-07-03T18:30:00.000Z","Packing 6":"Sabeel","Dispatched Date 6":"2026-07-07T18:30:00.000Z","Pieces 7":508,"Received Date 7":"2026-07-07T18:30:00.000Z","Shop 7":"Shop"},{"UNIQUE ID":"1019 28x38","Date":"2026-05-31T18:30:00.000Z","Overdue Days":91,"Item No.":"JDV01","Lot No.":1019,"Meter":554,"Short":"Martin","Size":"28x38","Pieces":534,"Item":"FF 1 Button","Average":1.0374531835205993,"Pieces 3":534,"Received Date 3":"2026-06-18T18:30:00.000Z","Fabricator 3":"EC Feb","Dispatched Date 3":"2026-07-28T18:30:00.000Z","Pieces 4":533,"Received Date 4":"2026-07-28T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-07-28T18:30:00.000Z","Pieces 5":533,"Received Date 5":"2026-07-28T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1020 28x38","Date":"2026-06-01T18:30:00.000Z","Overdue Days":90,"Item No.":"JDV01","Lot No.":1020,"Meter":394,"Short":"Martin","Size":"28x38","Pieces":384,"Item":"FF 1 Button","Average":1.0260416666666667,"Pieces 3":384,"Received Date 3":"2026-06-02T18:30:00.000Z","Fabricator 3":"EC Feb","Dispatched Date 3":"2026-07-15T18:30:00.000Z","Pieces 4":384,"Received Date 4":"2026-07-15T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-07-18T18:30:00.000Z","Pieces 5":384,"Received Date 5":"2026-07-18T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1021 28x34","Date":"2026-06-01T18:30:00.000Z","Overdue Days":90,"Item No.":"JDV01","Lot No.":1021,"Meter":419,"Short":4716,"Size":"28x34","Pieces":486,"Item":"FF 1 Button","Average":0.8621399176954733,"Pieces 2":486,"Received Date 2":"2026-06-02T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-02T18:30:00.000Z","Pieces 3":486,"Received Date 3":"2026-06-02T18:30:00.000Z","Fabricator 3":"Pawan","Dispatched Date 3":"2026-06-16T18:30:00.000Z","Pieces 4":486,"Received Date 4":"2026-06-16T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-21T18:30:00.000Z","Pieces 5":486,"Received Date 5":"2026-06-21T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1022 28x34","Date":"2026-06-01T18:30:00.000Z","Overdue Days":90,"Item No.":"JDV01","Lot No.":1022,"Meter":401,"Short":4716,"Size":"28x34","Pieces":462,"Item":"FF 1 Button","Average":0.8679653679653679,"Pieces 2":462,"Received Date 2":"2026-06-02T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-02T18:30:00.000Z","Pieces 3":462,"Received Date 3":"2026-06-02T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-07-06T18:30:00.000Z","Pieces 4":462,"Received Date 4":"2026-07-06T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-07-09T18:30:00.000Z","Pieces 5":462,"Received Date 5":"2026-07-09T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1023 32x36","Date":"2026-06-02T18:30:00.000Z","Overdue Days":89,"Item No.":"JDV01","Lot No.":1023,"Meter":467,"Short":4716,"Size":"32x36","Pieces":516,"Item":"FF 1 Button","Average":0.9050387596899225,"Pieces 2":516,"Received Date 2":"2026-06-02T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-02T18:30:00.000Z","Pieces 3":516,"Received Date 3":"2026-06-02T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-07-18T18:30:00.000Z","Pieces 4":516,"Received Date 4":"2026-07-18T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-07-18T18:30:00.000Z","Pieces 5":516,"Received Date 5":"2026-07-18T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1024 36x40","Date":"2026-06-02T18:30:00.000Z","Overdue Days":89,"Item No.":"JDV01","Lot No.":1024,"Meter":419,"Short":4716,"Size":"36x40","Pieces":420,"Item":"FF 1 Button","Average":0.9976190476190476,"Pieces 2":419,"Received Date 2":"2026-06-04T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-04T18:30:00.000Z","Pieces 3":419,"Received Date 3":"2026-06-04T18:30:00.000Z","Fabricator 3":"Juned","Dispatched Date 3":"2026-07-09T18:30:00.000Z","Pieces 4":418,"Received Date 4":"2026-07-09T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-07-11T18:30:00.000Z","Pieces 5":418,"Received Date 5":"2026-07-11T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1025 28x34","Date":"2026-06-02T18:30:00.000Z","Overdue Days":89,"Item No.":"JDV01","Lot No.":1025,"Meter":418,"Short":4716,"Size":"28x34","Pieces":498,"Item":"FF 1 Button","Average":0.8393574297188755,"Pieces 2":498,"Received Date 2":"2026-06-04T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-05T18:30:00.000Z","Pieces 3":498,"Received Date 3":"2026-06-05T18:30:00.000Z","Fabricator 3":"Juned","Dispatched Date 3":"2026-07-09T18:30:00.000Z","Pieces 4":498,"Received Date 4":"2026-07-09T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-07-11T18:30:00.000Z","Pieces 5":498,"Received Date 5":"2026-07-11T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1026 28x34","Date":"2026-06-03T18:30:00.000Z","Overdue Days":88,"Item No.":"JDV01","Lot No.":1026,"Meter":415,"Short":4716,"Size":"28x34","Pieces":486,"Item":"FF 1 Button","Average":0.8539094650205762,"Pieces 2":486,"Received Date 2":"2026-06-04T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-04T18:30:00.000Z","Pieces 3":486,"Received Date 3":"2026-06-04T18:30:00.000Z","Fabricator 3":"Pawan","Dispatched Date 3":"2026-06-22T18:30:00.000Z","Pieces 4":486,"Received Date 4":"2026-06-22T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-22T18:30:00.000Z","Pieces 5":486,"Received Date 5":"2026-06-22T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1027 28x34","Date":"2026-06-04T18:30:00.000Z","Overdue Days":87,"Item No.":"JDV01","Lot No.":1027,"Meter":415,"Short":4716,"Size":"28x34","Pieces":486,"Item":"FF 1 Button","Average":0.8539094650205762,"Pieces 2":486,"Received Date 2":"2026-06-06T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-07T18:30:00.000Z","Pieces 3":486,"Received Date 3":"2026-06-07T18:30:00.000Z","Fabricator 3":"Pawan","Dispatched Date 3":"2026-06-27T18:30:00.000Z","Pieces 4":486,"Received Date 4":"2026-06-27T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-29T18:30:00.000Z","Pieces 5":486,"Received Date 5":"2026-06-29T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1028 32x36","Date":"2026-06-05T18:30:00.000Z","Overdue Days":86,"Item No.":"JDV01","Lot No.":1028,"Meter":441,"Short":4716,"Size":"32x36","Pieces":492,"Item":"FF 1 Button","Average":0.8963414634146342,"Pieces 2":492,"Received Date 2":"2026-06-06T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-06T18:30:00.000Z","Pieces 3":492,"Received Date 3":"2026-06-06T18:30:00.000Z","Fabricator 3":"Virender","Dispatched Date 3":"2026-06-22T18:30:00.000Z","Pieces 4":492,"Received Date 4":"2026-06-22T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-23T18:30:00.000Z","Pieces 5":492,"Received Date 5":"2026-06-23T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1029 28x34","Date":"2026-06-06T18:30:00.000Z","Overdue Days":85,"Item No.":"JDV01","Lot No.":1029,"Meter":377,"Short":4716,"Size":"28x34","Pieces":438,"Item":"FF 1 Button","Average":0.860730593607306,"Pieces 2":438,"Received Date 2":"2026-06-06T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-06-08T18:30:00.000Z","Pieces 3":438,"Received Date 3":"2026-06-08T18:30:00.000Z","Fabricator 3":"Haseeb","Dispatched Date 3":"2026-06-24T18:30:00.000Z","Pieces 4":438,"Received Date 4":"2026-06-24T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-06-26T18:30:00.000Z","Pieces 5":438,"Received Date 5":"2026-06-26T18:30:00.000Z","Washing 5":"Anoop"},{"UNIQUE ID":"1030 32x36","Date":"2026-07-28T18:30:00.000Z","Overdue Days":33,"Lot No.":1030,"Meter":464,"Short":"Glanza(28/07/2026)","Size":"32x36","Pieces":510,"Item":"FF 1 Button","Average":0.9098039215686274,"Pieces 2":510,"Received Date 2":"2026-07-28T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-08-01T18:30:00.000Z","Pieces 3":510,"Received Date 3":"2026-08-01T18:30:00.000Z","Fabricator 3":"Pawan"},{"UNIQUE ID":"1031 28x34","Date":"2026-07-29T18:30:00.000Z","Overdue Days":32,"Lot No.":1031,"Meter":325,"Short":"Glanza(28/07/2026)","Size":"28x34","Pieces":378,"Item":"FF 1 Button","Average":0.8597883597883598,"Pieces 2":378,"Received Date 2":"2026-07-29T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-07-29T18:30:00.000Z","Pieces 3":378,"Received Date 3":"2026-07-29T18:30:00.000Z","Fabricator 3":"Pawan","Dispatched Date 3":"2026-08-17T18:30:00.000Z","Pieces 4":378,"Received Date 4":"2026-08-17T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-08-25T18:30:00.000Z","Pieces 5":378,"Received Date 5":"2026-08-25T18:30:00.000Z","Washing 5":"EC Washing"},{"UNIQUE ID":"1032 28x34","Date":"2026-07-29T18:30:00.000Z","Overdue Days":32,"Lot No.":1032,"Meter":328,"Short":"Glanza(28/07/2026)","Size":"28x34","Pieces":384,"Item":"FF 1 Button","Average":0.8541666666666666,"Pieces 2":384,"Received Date 2":"2026-07-30T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-08-01T18:30:00.000Z","Pieces 3":384,"Received Date 3":"2026-08-01T18:30:00.000Z","Fabricator 3":"EC Feb"},{"UNIQUE ID":"1033 28x34","Date":"2026-07-30T18:30:00.000Z","Overdue Days":31,"Lot No.":1033,"Meter":325,"Short":"Glanza(28/07/2026)","Size":"28x34","Pieces":378,"Item":"FF 1 Button","Average":0.8597883597883598,"Pieces 2":378,"Received Date 2":"2026-07-31T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-07-31T18:30:00.000Z","Pieces 3":378,"Received Date 3":"2026-07-31T18:30:00.000Z","Fabricator 3":"Pawan","Dispatched Date 3":"2026-08-27T18:30:00.000Z","Pieces 4":378,"Received Date 4":"2026-08-27T18:30:00.000Z","Kaj 4":"Pradeep"},{"UNIQUE ID":"1034 36x40","Date":"2026-07-31T18:30:00.000Z","Overdue Days":30,"Lot No.":1034,"Meter":385,"Short":"Glanza(28/07/2026)","Size":"36x40","Pieces":385,"Item":"FF 1 Button","Average":1,"Pieces 2":385,"Received Date 2":"2026-07-31T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-07-31T18:30:00.000Z","Pieces 3":385,"Received Date 3":"2026-07-31T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-08-09T18:30:00.000Z","Pieces 4":385,"Received Date 4":"2026-08-09T18:30:00.000Z","Kaj 4":"Pradeep"},{"UNIQUE ID":"1035 28x34","Date":"2026-08-09T18:30:00.000Z","Overdue Days":21,"Lot No.":1035,"Meter":351,"Short":"Glanza(09/08/2026)","Size":"28x34","Pieces":414,"Item":"FF 1 Button","Average":0.8478260869565217,"Pieces 2":414,"Received Date 2":"2026-08-10T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-08-12T18:30:00.000Z","Pieces 3":414,"Received Date 3":"2026-08-12T18:30:00.000Z","Fabricator 3":"Pawan","Dispatched Date 3":"2026-08-27T18:30:00.000Z","Pieces 4":414,"Received Date 4":"2026-08-27T18:30:00.000Z","Kaj 4":"Pradeep"},{"UNIQUE ID":"1036 28x34","Date":"2026-08-09T18:30:00.000Z","Overdue Days":21,"Lot No.":1036,"Meter":346,"Short":"Glanza(09/08/2026)","Size":"28x34","Pieces":408,"Item":"FF 1 Button","Average":0.8480392156862745,"Pieces 2":408,"Received Date 2":"2026-08-10T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-08-10T18:30:00.000Z","Pieces 3":408,"Received Date 3":"2026-08-10T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-08-24T18:30:00.000Z","Pieces 4":408,"Received Date 4":"2026-08-24T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-08-25T18:30:00.000Z","Pieces 5":408,"Received Date 5":"2026-08-25T18:30:00.000Z","Washing 5":"EC Washing"},{"UNIQUE ID":"1037 36x40","Date":"2026-08-09T18:30:00.000Z","Overdue Days":21,"Lot No.":1037,"Meter":412,"Short":"Glanza(09/08/2026)","Size":"36x40","Pieces":415,"Item":"FF 1 Button","Average":0.9927710843373494,"Pieces 2":415,"Received Date 2":"2026-08-10T18:30:00.000Z","Embroidery 2":"Naved","Dispatched Date 2":"2026-08-10T18:30:00.000Z","Pieces 3":415,"Received Date 3":"2026-08-10T18:30:00.000Z","Fabricator 3":"Kesar","Dispatched Date 3":"2026-08-19T18:30:00.000Z","Pieces 4":415,"Received Date 4":"2026-08-19T18:30:00.000Z","Kaj 4":"Pradeep","Dispatched Date 4":"2026-08-25T18:30:00.000Z","Pieces 5":415,"Received Date 5":"2026-08-25T18:30:00.000Z","Washing 5":"EC Washing"},{"UNIQUE ID":"1038 32x36","Date":"2026-08-09T18:30:00.000Z","Overdue Days":21,"Lot No.":1038,"Meter":404,"Short":"Glanza(09/08/2026)","Size":"32x36","Pieces":444,"Item":"FF 1 Button","Average":0.9099099099099099,"Pieces 2":444,"Received Date 2":"2026-08-11T18:30:00.000Z","Embroidery 2":"Sunil","Dispatched Date 2":"2026-08-11T18:30:00.000Z","Pieces 3":444,"Received Date 3":"2026-08-11T18:30:00.000Z","Fabricator 3":"Pawan"},{"UNIQUE ID":"1039 28x34","Date":"2026-08-24T18:30:00.000Z","Overdue Days":6,"Lot No.":1039,"Meter":212,"Short":"Cross Fire(18/03/2026)","Size":"28x34","Pieces":252,"Item":"FF 1 Button","Average":0.8412698412698413,"Pieces 2":252,"Received Date 2":"2026-08-26T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-08-26T18:30:00.000Z","Pieces 3":252,"Received Date 3":"2026-08-26T18:30:00.000Z","Fabricator 3":"Kesar"},{"UNIQUE ID":"1040 28x34","Date":"2026-08-25T18:30:00.000Z","Overdue Days":5,"Lot No.":1040,"Meter":203,"Short":"Cross Fire(18/03/2026)","Size":"28x34","Pieces":240,"Item":"FF 1 Button","Average":0.8458333333333333,"Pieces 3":240,"Received Date 3":"2026-08-26T18:30:00.000Z","Fabricator 3":"Kesar"},{"UNIQUE ID":"1041 28x34","Date":"2026-08-24T18:30:00.000Z","Overdue Days":6,"Lot No.":1041,"Meter":370,"Short":"Cross Fire(18/03/2026)","Size":"28x34","Pieces":432,"Item":"FF 1 Button","Average":0.8564814814814815,"Pieces 2":432,"Received Date 2":"2026-08-25T18:30:00.000Z","Embroidery 2":"Raju","Dispatched Date 2":"2026-08-25T18:30:00.000Z","Pieces 3":432,"Received Date 3":"2026-08-25T18:30:00.000Z","Fabricator 3":"Pawan"}];
+        /* ---------- end snapshot ---------- */
+
         function saveToCache(rawRows) {
             try {
                 localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), rows: rawRows }));
@@ -2791,14 +2885,28 @@
          *  throughout; on failure (after retries) we quietly keep the old data on screen
          *  instead of ever showing an error state over live content. */
         async function backgroundRefresh() {
-            showToast('loading', 'Syncing Data…', 'Fetching latest from production database');
+            SYNCING = true;
+            renderSyncStatus();
+            // Name the age of what is on screen — on a cold start that is the baked-in
+            // snapshot, and the user should not mistake it for live numbers.
+            showToast('loading', 'Syncing Data…', LAST_SYNC
+                ? `Showing data from ${relTime(LAST_SYNC)} — fetching latest now`
+                : 'Fetching latest from production database');
             try {
                 const freshRows = await fetchWithRetry(2);
                 saveToCache(freshRows);
-                showDashboard(freshRows, 'fresh');
-                showToast('success', 'Data Updated ✓', `${freshRows.length} lots loaded · ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`, 3500);
+                SYNCING = false;
+                SYNC_FAILED = false;
+                showDashboard(freshRows, 'fresh', Date.now());
+                showToast('success', 'Data Updated ✓', `${freshRows.length} lots loaded · ${fmtClock(Date.now())}`, 3500);
             } catch (err) {
-                showToast('error', 'Still Syncing…', 'Showing your last saved data — will retry automatically', 5000);
+                // Keep the data — and its real age — on screen; only the badge changes
+                SYNCING = false;
+                SYNC_FAILED = true;
+                renderSyncStatus();
+                showToast('error', 'Still Syncing…', LAST_SYNC
+                    ? `Showing data from ${relTime(LAST_SYNC)} — will retry automatically`
+                    : 'Showing your last saved data — will retry automatically', 5000);
                 scheduleAutoRetry();
             }
         }
@@ -2844,8 +2952,70 @@
             }
         }
 
-        /** Show data on screen and update the refresh timestamp */
-        function showDashboard(validRows, sourceLabel) {
+        /* ============== LAST-SYNC TRACKING ==============
+           LAST_SYNC is when the rows on screen actually came back from the API — NOT when
+           they were painted. Those differ every time we render from cache: opening the page
+           after a day would otherwise report "refreshed <now>" over day-old numbers. */
+        let LAST_SYNC = null;      // epoch ms of the fetch that produced the visible data
+        let SYNC_FAILED = false;   // last refresh attempt errored — data on screen is older
+        let SYNCING = false;       // a refresh is in flight right now
+
+        function fmtClock(ms) {
+            return new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        /** "just now" / "4 min ago" / "2 hr ago" / "Yesterday 09:15" */
+        function relTime(ms) {
+            const mins = Math.floor((Date.now() - ms) / 60000);
+            if (mins < 1) return 'just now';
+            if (mins === 1) return '1 min ago';
+            if (mins < 60) return `${mins} min ago`;
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs === 1 ? '1 hr ago' : `${hrs} hr ago`;
+            const days = Math.floor(hrs / 24);
+            return days === 1 ? `Yesterday ${fmtClock(ms)}` : `${days} days ago`;
+        }
+
+        function renderSyncStatus() {
+            const el = document.getElementById('syncStatus');
+            if (!el) return;
+
+            if (SYNCING) {
+                // Keep the age visible while syncing — a sync takes 30–50s against this
+                // endpoint, and that is exactly when "how old is this?" gets asked.
+                el.className = 'sync-status syncing';
+                el.innerHTML = `<span class="ss-dot"></span>Syncing…`
+                    + (LAST_SYNC ? ` <b>·</b> showing <b>${relTime(LAST_SYNC)}</b>` : '');
+                el.title = LAST_SYNC
+                    ? `Fetching the latest rows; on screen is data from ${fmtClock(LAST_SYNC)}`
+                    : 'Fetching the latest rows from the production sheet';
+                return;
+            }
+            if (LAST_SYNC === null) {
+                el.className = 'sync-status';
+                el.innerHTML = `<span class="ss-dot"></span>Not synced yet`;
+                el.title = 'No successful fetch yet this session';
+                return;
+            }
+
+            const age = Date.now() - LAST_SYNC;
+            // Failed sync, or older than 6× the 5-min TTL, is worth flagging in red
+            const cls = (SYNC_FAILED || age > CACHE_TTL * 6) ? 'failed'
+                : (age > CACHE_TTL ? 'stale' : '');
+            el.className = 'sync-status' + (cls ? ' ' + cls : '');
+            el.innerHTML = `<span class="ss-dot"></span>Updated <b>${relTime(LAST_SYNC)}</b>`;
+            el.title = `Data pulled from the sheet at ${fmtClock(LAST_SYNC)} on `
+                + new Date(LAST_SYNC).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                + (SYNC_FAILED ? ' — a newer sync was attempted and failed, so this is the latest data available' : '');
+        }
+
+        /* The label is relative ("6 min ago"), so it has to keep counting on its own —
+           without this it would freeze at whatever it said when the data last landed. */
+        setInterval(renderSyncStatus, 30000);
+
+        /** Show data on screen. `fetchedAt` is when these rows came back from the API:
+         *  Date.now() for a live fetch, the stored cache timestamp when replaying cache. */
+        function showDashboard(validRows, sourceLabel, fetchedAt) {
             DATA = validRows.map(normalize);
             FILTERED = ACTIVE_COLLECTION === 'All' ? DATA.slice() : DATA.filter(d => d.short === ACTIVE_COLLECTION);
             uploadCard.style.display = 'none';
@@ -2853,10 +3023,13 @@
             buildCollectionFilter();
             renderAll();
             updateLotSliderThumb();
-            // Show last-refreshed time in the record pill
+
+            if (fetchedAt) LAST_SYNC = fetchedAt;
+            renderSyncStatus();
+
+            // Compact echo of the same timestamp inside the record pill
             const pill = document.querySelector('.record-pill');
-            if (pill) {
-                const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            if (pill && LAST_SYNC) {
                 let timeSpan = document.getElementById('lastRefresh');
                 if (!timeSpan) {
                     timeSpan = document.createElement('span');
@@ -2864,7 +3037,7 @@
                     timeSpan.style.cssText = 'font-size:11px;color:var(--muted);font-weight:400;margin-left:4px;';
                     pill.appendChild(timeSpan);
                 }
-                timeSpan.textContent = `· refreshed ${ts}`;
+                timeSpan.textContent = `· synced ${fmtClock(LAST_SYNC)}`;
             }
         }
 
@@ -2916,7 +3089,8 @@
                 });
                 if (skelText) skelText.textContent = 'Processing data…';
                 saveToCache(freshRows);
-                showDashboard(freshRows, 'fresh');
+                SYNC_FAILED = false;
+                showDashboard(freshRows, 'fresh', Date.now());
             } catch (err) {
                 setLoadState('error', `Having trouble reaching the server — retrying automatically…`);
                 firstLoadRetryTimer = setTimeout(attemptFirstLoad, 15000);
@@ -2932,15 +3106,32 @@
          */
         async function fetchData() {
             const cached = loadFromCache();
+            const seedRows = (typeof FALLBACK_DATA !== 'undefined' && FALLBACK_DATA.length)
+                ? FALLBACK_DATA.filter(r => r['Lot No.'] && String(r['Lot No.']).trim() !== '')
+                : [];
 
-            // FAST PATH: cache exists → show instantly, refresh in background
-            if (cached && cached.rows.length) {
-                showDashboard(cached.rows, 'cache');
+            // Two offline sources can be on hand: this browser's own last sync (cache) and
+            // the snapshot baked into the file (seed). Show whichever is NEWER — never
+            // assume the cache wins. A browser carrying a week-old cache, opening a file
+            // that was re-baked yesterday, must get yesterday's numbers, not last week's.
+            const cacheTs = (cached && cached.rows.length) ? cached.ts : -Infinity;
+            const seedTs = seedRows.length ? FALLBACK_STAMP : -Infinity;
+
+            if (cacheTs >= seedTs && cacheTs !== -Infinity) {
+                showDashboard(cached.rows, 'cache', cached.ts);
+                backgroundRefresh();
+                return;
+            }
+            if (seedTs !== -Infinity) {
+                // Cold start, or a seed that is fresher than this browser's stale cache.
+                // Stamped with FALLBACK_STAMP so the badge reports the snapshot's real
+                // age — an honest "Updated 3 days ago" beats a fake "just now".
+                showDashboard(seedRows, 'seed', FALLBACK_STAMP);
                 backgroundRefresh();
                 return;
             }
 
-            // SLOW PATH: first visit, no cache — show loading skeleton, retry before failing
+            // LAST RESORT: no cache and no usable snapshot — skeleton, retry before failing
             attemptFirstLoad();
         }
 
@@ -4298,6 +4489,7 @@
         })();
 
         /* Kick off the data fetch — last, so every declaration above is initialized first */
+        renderSyncStatus();   // paint "Not synced yet" rather than an empty pill
         fetchData();
     </script>
 </body>
