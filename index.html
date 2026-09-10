@@ -837,6 +837,59 @@
             margin-left: 6px;
         }
 
+        /* ---- JUMP-TO-LOT SEARCH (new element only — no existing rule altered) ----
+           Values copied from #articleInput so the box is visually identical to the
+           Article / Fabric search boxes already on this row. */
+        #lotFilter {
+            font-family: inherit;
+            padding: 8px 28px 8px 34px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: white;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            width: 200px;
+            max-width: 100%;
+        }
+
+        #lotFilter:focus {
+            outline: none;
+            border-color: var(--rose);
+            box-shadow: 0 0 0 3px var(--rose-tint);
+        }
+
+        .lot-filter-clear {
+            position: absolute;
+            right: 7px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+            background: transparent;
+            border: none;
+            font-size: 18px;
+            line-height: 1;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 2px 5px;
+            border-radius: 6px;
+        }
+
+        .lot-filter-clear.show { display: block; }
+
+        .lot-count {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .lot-count.none { color: var(--coral); }
+
+        @media (max-width: 768px) {
+            #lotFilter { width: 100%; font-size: 16px; }
+        }
+
         .lot-select-wrap {
             display: flex;
             align-items: center;
@@ -2552,7 +2605,7 @@
                 </div>
             </div>
 
-            <!-- LOT TRACKER -->
+            <!-- LOT TRACKER with update code -->
             <div class="tracker-card fadeUp" style="animation-delay:.33s">
                 <div class="tracker-header">
                     <h3>Lot Stage Tracker <span>— pick a lot, or search by article / fabric</span></h3>
@@ -2563,8 +2616,22 @@
                             <button id="modeCloth" type="button">By Fabric</button>
                         </div>
                         <div id="lotSelectGroup" class="lot-select-wrap">
-                            <label for="lotSelect">Lot</label>
-                            <select id="lotSelect"></select>
+                            <!-- Typing beats scrolling the dropdown once the sheet grows.
+                                 Filters the list beside it; a single survivor opens itself. -->
+                            <div class="search-input-wrap lot-filter-wrap">
+                                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <input type="text" id="lotFilter" aria-label="Jump to a lot number"
+                                    placeholder="Jump to lot — 1034, Glanza…" autocomplete="off" />
+                                <button type="button" class="lot-filter-clear" id="lotFilterClear"
+                                    aria-label="Clear lot search" title="Clear">&times;</button>
+                            </div>
+                            <select id="lotSelect" aria-label="Select lot number"></select>
+                            <span class="lot-count" id="lotCount"></span>
                         </div>
                         <div id="articleSearchGroup" class="lot-select-wrap" style="display:none">
                             <label for="articleInput">Article</label>
@@ -3178,6 +3245,14 @@
             const d = new Date(s); return isNaN(d) ? null : d;
         }
         function daysBetween(a, b) { if (!a || !b) return null; return Math.round((b - a) / (1000 * 60 * 60 * 24)); }
+
+        /* Month a lot is filed under — always the sheet's own Date column.
+           NOTE: the bracket in a fabric name ("Glanza(28/07/2026)") is when that FABRIC
+           arrived, not when the lot was cut, so it must not drive month grouping. Using it
+           dragged lots 1039-1041 — entered in late August — back into March 2026. */
+        function monthKey(d) {
+            return d.date ? d.date.getFullYear() + '-' + String(d.date.getMonth() + 1).padStart(2, '0') : null;
+        }
         function fmtDate(d) { if (!d) return '—'; return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }); }
         function num(v) { const n = parseFloat(String(v || '').replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
         function txt(v) { const t = String(v || '').trim(); return (!t || t.startsWith('---')) ? '' : t; }
@@ -3345,22 +3420,76 @@
             document.getElementById('kOverdueSub').textContent = `>30 days — tap to view`;
         }
 
+        /* Typing a lot number beats scrolling the dropdown once the sheet grows. Matches
+           the lot number first, then item / fabric / size / article, so "1034", "Glanza"
+           and "28x34" all work. */
+        let lotFilterQuery = '';
+
+        // Natural ordering: a plain +cast turns a lot like "1034A" into NaN→0 and floats
+        // it to the top. Zero-pad the numeric head instead and compare as text.
+        function lotSortKey(lotNo) {
+            const m = String(lotNo || '').match(/^(\d+)(.*)$/);
+            return m ? m[1].padStart(8, '0') + m[2] : '~' + String(lotNo || '');
+        }
+
+        function lotMatchesQuery(d, q) {
+            if (!q) return true;
+            return [d.lotNo, d.item, d.itemNo, d.short, d.size]
+                .some(v => String(v || '').toLowerCase().includes(q));
+        }
+
         function renderLotSelect() {
             const sel = document.getElementById('lotSelect');
+            const q = lotFilterQuery.trim().toLowerCase();
+            const all = [...visibleData()].sort((a, b) => lotSortKey(a.lotNo).localeCompare(lotSortKey(b.lotNo)));
+            const matches = all.filter(d => lotMatchesQuery(d, q));
+
+            const previous = sel.value;
             sel.innerHTML = '';
-            const sorted = [...visibleData()].sort((a, b) => (+a.lotNo || 0) - (+b.lotNo || 0));
-            for (const d of sorted) {
+            for (const d of matches) {
                 const opt = document.createElement('option');
                 opt.value = d.lotNo;
                 const collTag = d.short ? ` · ${d.short}` : '';
                 opt.textContent = `Lot ${d.lotNo}${collTag} — ${d.item || d.itemNo} (${d.size})`;
                 sel.appendChild(opt);
             }
+            sel.disabled = matches.length === 0;
+            // Keep the open lot selected when it survives the filter, so typing does not
+            // yank the detail panel away from what the user was already looking at.
+            if (matches.some(d => d.lotNo === previous)) sel.value = previous;
             sel.onchange = () => renderLotDetail(sel.value);
+
+            const count = document.getElementById('lotCount');
+            if (count) {
+                count.classList.toggle('none', !!q && matches.length === 0);
+                count.textContent = !q ? `${all.length} lots`
+                    : matches.length ? `${matches.length} of ${all.length}`
+                        : `No lot matches “${lotFilterQuery.trim()}”`;
+            }
+            const clear = document.getElementById('lotFilterClear');
+            if (clear) clear.classList.toggle('show', !!q);
 
             const dl = document.getElementById('articleList');
             const uniqueArticles = [...new Set(visibleData().map(d => d.itemNo).filter(Boolean))].sort();
             dl.innerHTML = uniqueArticles.map(a => `<option value="${a}">`).join('');
+            return matches;
+        }
+
+        function onLotFilter(value) {
+            lotFilterQuery = value;
+            const matches = renderLotSelect();
+            // A single survivor is unambiguous — open it without a second click.
+            if (matches.length === 1) renderLotDetail(matches[0].lotNo);
+            else if (matches.length && !matches.some(d => d.lotNo === document.getElementById('lotSelect').value)) {
+                renderLotDetail(matches[0].lotNo);
+            }
+        }
+
+        function clearLotFilter() {
+            const input = document.getElementById('lotFilter');
+            if (input) input.value = '';
+            onLotFilter('');
+            if (input) input.focus();
         }
 
         /* ---------- SEARCH MODES: Lot No. / Article / Fabric ---------- */
@@ -3416,6 +3545,8 @@
             };
             document.getElementById('articleInput').oninput = e => searchByArticle(e.target.value.trim());
             document.getElementById('clothInput').oninput = e => renderClothChips(e.target.value.trim());
+            document.getElementById('lotFilter').oninput = e => onLotFilter(e.target.value);
+            document.getElementById('lotFilterClear').onclick = clearLotFilter;
 
             applySearchMode(searchMode); // survive a re-render without losing the active mode
         }
@@ -4090,9 +4221,7 @@
                 if (v !== f.vendor.trim().toLowerCase()) return false;
             }
             if (!ignore.month && f.month) {
-                if (!d.date) return false;
-                const key = d.date.getFullYear() + '-' + String(d.date.getMonth() + 1).padStart(2, '0');
-                if (key !== f.month) return false;
+                if (monthKey(d) !== f.month) return false;
             }
             if (!ignore.overdue && f.overdueOnly) {
                 if (isLotDelivered(d) || d.overdue <= 30) return false;
@@ -4309,7 +4438,8 @@
             if (!sel) return;
             const keys = new Set();
             DATA.forEach(d => {
-                if (d.date) keys.add(d.date.getFullYear() + '-' + String(d.date.getMonth() + 1).padStart(2, '0'));
+                const k = monthKey(d);
+                if (k) keys.add(k);
             });
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             const now = new Date();
@@ -4326,6 +4456,15 @@
         function selectAndScrollToLot(lotNo) {
             const sel = document.getElementById('lotSelect');
             if (sel) {
+                // A jump-to-lot query may have filtered this row's lot out of the dropdown;
+                // setting .value would then silently fail and open the wrong lot. Drop the
+                // query first so the tapped row always wins.
+                if (lotFilterQuery && !Array.from(sel.options).some(o => o.value === lotNo)) {
+                    const input = document.getElementById('lotFilter');
+                    if (input) input.value = '';
+                    lotFilterQuery = '';
+                    renderLotSelect();
+                }
                 sel.value = lotNo;
                 if (sel.onchange) sel.onchange();
             }
